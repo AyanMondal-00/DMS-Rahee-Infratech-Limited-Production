@@ -7,7 +7,6 @@ export default function Organizations() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [name, setName] = useState('');
-  const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,13 +32,17 @@ export default function Organizations() {
     e.preventDefault();
     setError('');
 
+    if (!name.trim()) {
+      setError('Company / Tenant name is required.');
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await api.post('/organizations', { name: name.trim(), code: code.trim().toUpperCase() });
+      await api.post('/organizations', { name: name.trim() });
       setSubmitting(false);
       setShowModal(false);
       setName('');
-      setCode('');
       fetchOrgs();
     } catch (err) {
       setSubmitting(false);
@@ -135,27 +138,16 @@ export default function Organizations() {
               )}
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Company Name (*)</label>
+                <label className="block font-bold text-slate-700 mb-1">Company / Tenant Name (*)</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
                   placeholder="e.g. Rahee Infratech Limited"
-                  className="w-full p-2.5 border border-slate-300 rounded-xl"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Unique Code (*)</label>
-                <input
-                  type="text"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  required
-                  placeholder="e.g. RAHEE"
-                  className="w-full p-2.5 border border-slate-300 rounded-xl font-mono uppercase"
-                />
+                <p className="text-[11px] text-slate-400 mt-1">A unique system identifier and primary project directory will be generated automatically.</p>
               </div>
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200">

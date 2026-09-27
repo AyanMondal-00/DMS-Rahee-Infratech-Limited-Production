@@ -17,62 +17,76 @@ const {
   BKS_FOLDER_MODE
 } = require('../config/workflow.config');
 
-// Upload Initial Document (V1)
+// Upload Initial Document(s) (V1) - Supports both Single and Multiple Documents at a single time
 async function uploadDocument(req, res) {
+  let uploadedFiles = [];
+  if (req.files) {
+    if (Array.isArray(req.files)) {
+      uploadedFiles = req.files;
+    } else if (typeof req.files === 'object') {
+      Object.values(req.files).forEach(item => {
+        if (Array.isArray(item)) uploadedFiles.push(...item);
+        else if (item) uploadedFiles.push(item);
+      });
+    }
+  } else if (req.file) {
+    uploadedFiles = [req.file];
+  }
+
+  const cleanUploadedFiles = () => {
+    uploadedFiles.forEach(f => {
+      if (f && f.path && fs.existsSync(f.path)) {
+        try { fs.unlinkSync(f.path); } catch (e) {}
+      }
+    });
+  };
+
   try {
-    if (req.user.is_super_admin) {
-      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    // STRICT RULE: Only Rahul Dey, Om Jha, and Somnath Mondal can upload documents
+    const userEmail = (req.user.email || '').toLowerCase().trim();
+    const userName = (req.user.name || '').toLowerCase().trim();
+    const isAuthorizedUploader = 
+      userEmail === 'rahul.d@rahee.com' ||
+      userEmail.startsWith('om.jha@') ||
+      userEmail === 's.mondal@rahee.com' ||
+      userName.includes('rahul dey') ||
+      userName.includes('om jha') ||
+      userName.includes('somnath mondal') ||
+      [5, 9, 10].includes(req.user.id);
+
+    if (!isAuthorizedUploader) {
+      cleanUploadedFiles();
       return res.status(403).json({
         success: false,
-        message: 'Forbidden: Super Admin is an administrative governance role and is strictly restricted from uploading or creating document files.'
+        message: 'Forbidden: Document upload is strictly restricted to Rahul Dey, Om Jha, and Somnath Mondal.'
       });
     }
 
-    // STRICT RULE: Document Upload permissions:
-    // 1. RAHEE: Rahul Dey (rahul.d@rahee.com) & Somnath Mondal (s.mondal@rahee.com) under Bikramshila/RAHEE
-    // 2. IRCON: Om Jha (om.jha@ircon.org) under Bikramshila/IRCON
-    const userEmail = req.user.email?.toLowerCase() || '';
-    const isRaheeUploader = userEmail === 'rahul.d@rahee.com' || userEmail === 's.mondal@rahee.com' || [2, 3, 7].includes(req.user.role_id) || ['RAHEE_ADMIN_REVIEWER', 'RAHEE_EXEC_ADMIN', 'DOCUMENT_UPLOADER'].includes(req.user.role_name);
-    const isIrconUploader = userEmail.startsWith('om.jha@') || req.user.role_id === 8 || ['IRCON_ADMIN_REVIEWER', 'IRCON_ADMIN'].includes(req.user.role_name);
-
-    if (!isRaheeUploader && !isIrconUploader) {
-      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: Document upload is restricted to authorized uploaders (Rahul Dey & Somnath Mondal for Rahee under Bikramshila/RAHEE, Om Jha for Ircon under Bikramshila/IRCON).'
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please upload a valid document file.' });
-    }
-
-    const { title, description, category } = req.body;
-    if (!title || title.trim().length === 0) {
-      return res.status(400).json({ success: false, message: 'Document title is required and cannot be empty.' });
-    }
-
-    if (title.trim().length > 255) {
-      return res.status(400).json({ success: false, message: 'Document title cannot exceed 255 characters.' });
-    }
-
-    if (category && category.trim().length > 100) {
-      return res.status(400).json({ success: false, message: 'Category name cannot exceed 100 characters.' });
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please select at least one document file to upload.' });
     }
 
     const organizationId = req.user.organization_id;
     if (!organizationId && !req.user.is_super_admin) {
+      cleanUploadedFiles();
       return res.status(403).json({ success: false, message: 'User does not belong to an active organization.' });
     }
 
     const orgIdToUse = req.user.organization_id ? parseInt(req.user.organization_id) : 1;
 
-    // Calculate file hash (SHA-256)
-    const filePath = req.file.path;
-    const fileHash = await calculateFileHash(filePath);
+    // Parse files_metadata if provided
+    let filesMetadata = [];
+    if (req.body.files_metadata) {
+      try {
+        filesMetadata = typeof req.body.files_metadata === 'string' 
+          ? JSON.parse(req.body.files_metadata) 
+          : req.body.files_metadata;
+      } catch (e) {
+        filesMetadata = [];
+      }
+    }
 
     // Determine document type label and enforce strict format matching validation
-    const ext = path.extname(req.file.originalname).toUpperCase().replace('.', '');
     const docTypeMap = {
       PDF: 'PDF',
       DOC: 'WORD',
@@ -95,19 +109,6 @@ async function uploadDocument(req, res) {
       IGES: 'CAD'
     };
 
-    const actualDetectedType = docTypeMap[ext];
-    if (!actualDetectedType) {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      return res.status(400).json({
-        success: false,
-        message: `Unsupported File Format (.${ext.toLowerCase()}). Only Microsoft Word, PDF, Microsoft Excel, Microsoft PowerPoint, Images, and CAD files (.dwg, .dxf, .stl, .obj, .step, .stp, .iges) are supported.`
-      });
-    }
-
-    const userSelectedType = (req.body.document_type && req.body.document_type.trim()) 
-      ? req.body.document_type.trim().toUpperCase() 
-      : actualDetectedType;
-
     const typeLabels = {
       PDF: 'PDF Document',
       WORD: 'Microsoft Word',
@@ -117,20 +118,35 @@ async function uploadDocument(req, res) {
       CAD: 'CAD Drawing / 3D Model'
     };
 
-    // Strict Type Mismatch Validation Check
-    if (['PDF', 'WORD', 'EXCEL', 'POWERPOINT', 'IMAGE', 'CAD'].includes(userSelectedType)) {
-      if (userSelectedType !== actualDetectedType) {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        const selectedLabel = typeLabels[userSelectedType] || userSelectedType;
-        const detectedLabel = typeLabels[actualDetectedType] || actualDetectedType;
+    // Pre-validate all uploaded files before inserting into database
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const ext = path.extname(file.originalname).toUpperCase().replace('.', '');
+      const actualDetectedType = docTypeMap[ext];
+
+      if (!actualDetectedType) {
+        cleanUploadedFiles();
         return res.status(400).json({
           success: false,
-          message: `Validation Error: You selected '${selectedLabel}', but uploaded a ${detectedLabel} file (.${ext.toLowerCase()}). Please select '${detectedLabel}' in the dropdown or attach a matching file.`
+          message: `File "${file.originalname}" has an unsupported format (.${ext.toLowerCase()}). Supported formats: PDF, Word, Excel, PowerPoint, Images, and CAD files (.dwg, .dxf, .stl, .obj, .step, .stp, .iges).`
         });
       }
-    }
 
-    let folderIdToUse = req.body.folder_id ? parseInt(req.body.folder_id) : null;
+      // Check per-file or global selected type mismatch if specified (unless AUTO or not specified)
+      const meta = filesMetadata.find(m => m.filename === file.originalname || m.index === i) || {};
+      const fileSelectedType = (meta.document_type || (uploadedFiles.length === 1 ? req.body.document_type : ''))?.trim().toUpperCase();
+      if (fileSelectedType && fileSelectedType !== 'AUTO' && ['PDF', 'WORD', 'EXCEL', 'POWERPOINT', 'IMAGE', 'CAD'].includes(fileSelectedType)) {
+        if (fileSelectedType !== actualDetectedType) {
+          cleanUploadedFiles();
+          const selectedLabel = typeLabels[fileSelectedType] || fileSelectedType;
+          const detectedLabel = typeLabels[actualDetectedType] || actualDetectedType;
+          return res.status(400).json({
+            success: false,
+            message: `Validation Error for "${file.originalname}": You selected '${selectedLabel}', but uploaded a ${detectedLabel} file (.${ext.toLowerCase()}).`
+          });
+        }
+      }
+    }
 
     // Helper to check folder branch ancestor
     async function isFolderUnderBranch(fId, branchName) {
@@ -150,57 +166,32 @@ async function uploadDocument(req, res) {
       return false;
     }
 
-    // Enforce Strict Company Upload Branch Scope:
-    // 1. Rahee Admin (Rahul Dey) & Uploaders can ONLY upload under Bikramshila/RAHEE
-    // 2. Ircon Admin (Om Jha) can ONLY upload under Bikramshila/IRCON
-    if (!req.user.is_super_admin) {
-      const userEmail = req.user.email?.toLowerCase() || '';
-      const isIrconUser = (req.user.organization_id === 2 || req.user.role_id === 8 || req.user.role_name === 'IRCON_ADMIN_REVIEWER' || req.user.role_name === 'IRCON_ADMIN' || userEmail.startsWith('om.jha@'));
-      const userBranch = isIrconUser ? 'IRCON' : 'RAHEE';
+    let defaultFolderId = req.body.folder_id ? parseInt(req.body.folder_id) : null;
+    const isIrconUser = (req.user.organization_id === 2 || req.user.role_id === 8 || req.user.role_name === 'IRCON_ADMIN_REVIEWER' || req.user.role_name === 'IRCON_ADMIN' || userEmail.startsWith('om.jha@'));
+    const userBranch = isIrconUser ? 'IRCON' : 'RAHEE';
 
-      if (folderIdToUse) {
-        const isUnderOwnBranch = await isFolderUnderBranch(folderIdToUse, userBranch);
+    if (!req.user.is_super_admin) {
+      if (defaultFolderId) {
+        const isUnderOwnBranch = await isFolderUnderBranch(defaultFolderId, userBranch);
         if (!isUnderOwnBranch) {
-          // If specified folder ID is not under branch or not found, safely fallback to company branch root folder
           const defaultSub = await db.query('SELECT id FROM folders WHERE UPPER(name) = ?', [userBranch]);
           if (defaultSub && defaultSub.length > 0) {
-            folderIdToUse = defaultSub[0].id;
+            defaultFolderId = defaultSub[0].id;
           }
         }
       } else {
-        // Auto-assign default dedicated company subfolder under Bikramshila
         const defaultSub = await db.query('SELECT id FROM folders WHERE UPPER(name) = ?', [userBranch]);
         if (defaultSub && defaultSub.length > 0) {
-          folderIdToUse = defaultSub[0].id;
+          defaultFolderId = defaultSub[0].id;
         }
       }
     }
 
     const initialStatus = WORKFLOW_REVIEW_ENABLED ? 'PENDING_REVIEW_1' : 'FINAL_APPROVED';
     const verTag = STATIC_VERSION_V1_ONLY ? 'General Version V1' : 'V1';
+    const createdDocuments = [];
 
-    // 1. Create Document Entry
-    const docRes = await db.query(
-      `INSERT INTO documents (organization_id, uploaded_by, title, description, category, document_type, status, current_version_number, is_locked, folder_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-      [orgIdToUse, req.user.id, title.trim(), description || '', category || 'General', userSelectedType, initialStatus, verTag, folderIdToUse]
-    );
-
-    const documentId = docRes.insertId;
-
-    // 2. Create Initial Version Entry
-    const verRes = await db.query(
-      `INSERT INTO document_versions (document_id, organization_id, version_number, version_index, original_filename, storage_key, file_size, mime_type, file_hash, uploaded_by, change_description, review_status)
-       VALUES (?, ?, ?, 1.0, ?, ?, ?, ?, ?, ?, 'Initial document submission', ?)`,
-      [documentId, orgIdToUse, verTag, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, fileHash, req.user.id, initialStatus]
-    );
-
-    const versionId = verRes.insertId;
-
-    // Update document's current_version_id
-    await db.query('UPDATE documents SET current_version_id = ? WHERE id = ?', [versionId, documentId]);
-
-    // 3. Dispatch Notification to Stakeholders of Specific Company (Target Company Users + Super Admin)
+    // Pre-fetch target notification users
     const targetUsers = await db.query(
       `SELECT DISTINCT u.id, u.name, u.email, u.role_id, r.name as role_name
        FROM users u
@@ -217,61 +208,131 @@ async function uploadDocument(req, res) {
       'arunabha.p@rahee.com'
     ];
 
-    for (const targetUser of targetUsers) {
-      if (targetUser.email && EXCLUDED_NOTIF_EMAILS.includes(targetUser.email.toLowerCase())) {
-        continue; // Skip Manish Kumar Patra, Ayush Khaitan, Manoj Ghosh, and Arunabha Pyne
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const ext = path.extname(file.originalname).toUpperCase().replace('.', '');
+      const actualDetectedType = docTypeMap[ext] || 'OTHER';
+
+      const meta = filesMetadata.find(m => m.filename === file.originalname || m.index === i) || {};
+
+      // Determine clean Title
+      let fileTitle = '';
+      if (meta.title && meta.title.trim()) {
+        fileTitle = meta.title.trim();
+      } else if (uploadedFiles.length === 1 && req.body.title && req.body.title.trim()) {
+        fileTitle = req.body.title.trim();
+      } else {
+        const lastDot = file.originalname.lastIndexOf('.');
+        const rawClean = lastDot !== -1 ? file.originalname.slice(0, lastDot) : file.originalname;
+        fileTitle = rawClean.replace(/[_]/g, ' ').trim();
       }
 
-      const isUploader = targetUser.id === req.user.id;
-      const notifTitle = isUploader 
-        ? '📄 Document Uploaded Successfully' 
-        : `🔔 New Document Uploaded: ${title.trim()}`;
-      
-      const notifMessage = isUploader
-        ? WORKFLOW_REVIEW_ENABLED 
-          ? `Your document "${title.trim()}" (${verTag}) has been uploaded successfully and submitted for workflow review.`
-          : `Your document "${title.trim()}" (${verTag}) has been uploaded successfully and saved to the repository.`
-        : `A new document "${title.trim()}" (${verTag}) was uploaded by ${req.user.name} and is available in the repository.`;
+      if (fileTitle.length > 255) {
+        fileTitle = fileTitle.substring(0, 255);
+      }
 
-      await sendNotification({
-        recipientId: targetUser.id,
-        senderId: req.user.id,
-        documentId: documentId,
-        organizationId: orgIdToUse,
-        title: notifTitle,
-        message: notifMessage,
-        type: isUploader ? 'DOCUMENT_UPLOAD_SUCCESS' : 'NEW_DOCUMENT_UPLOADED',
-        emailDetails: {
-          documentTitle: title.trim(),
-          documentVersion: verTag
+      const fileDescription = (meta.description !== undefined ? meta.description : (req.body.description || '')).trim();
+      const fileCategory = (meta.category || req.body.category || 'General').trim();
+      const fileDocType = (meta.document_type || (uploadedFiles.length === 1 && req.body.document_type ? req.body.document_type : actualDetectedType)).trim().toUpperCase();
+
+      let fileFolderId = meta.folder_id ? parseInt(meta.folder_id) : defaultFolderId;
+      if (!req.user.is_super_admin && fileFolderId) {
+        const isUnder = await isFolderUnderBranch(fileFolderId, userBranch);
+        if (!isUnder) fileFolderId = defaultFolderId;
+      }
+
+      // SHA-256 Hash
+      const fileHash = await calculateFileHash(file.path);
+
+      // 1. Insert Document
+      const docRes = await db.query(
+        `INSERT INTO documents (organization_id, uploaded_by, title, description, category, document_type, status, current_version_number, is_locked, folder_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+        [orgIdToUse, req.user.id, fileTitle, fileDescription, fileCategory, fileDocType, initialStatus, verTag, fileFolderId]
+      );
+
+      const documentId = docRes.insertId;
+
+      // 2. Insert Version
+      const verRes = await db.query(
+        `INSERT INTO document_versions (document_id, organization_id, version_number, version_index, original_filename, storage_key, file_size, mime_type, file_hash, uploaded_by, change_description, review_status)
+         VALUES (?, ?, ?, 1.0, ?, ?, ?, ?, ?, ?, 'Initial document submission', ?)`,
+        [documentId, orgIdToUse, verTag, file.originalname, file.filename, file.size, file.mimetype, fileHash, req.user.id, initialStatus]
+      );
+
+      const versionId = verRes.insertId;
+
+      // Update current_version_id
+      await db.query('UPDATE documents SET current_version_id = ? WHERE id = ?', [versionId, documentId]);
+
+      // 3. Dispatch Notification
+      for (const targetUser of targetUsers) {
+        if (targetUser.email && EXCLUDED_NOTIF_EMAILS.includes(targetUser.email.toLowerCase())) {
+          continue;
         }
+
+        const isUploader = targetUser.id === req.user.id;
+        const notifTitle = isUploader 
+          ? '📄 Document Uploaded Successfully' 
+          : `🔔 New Document Uploaded: ${fileTitle}`;
+        
+        const notifMessage = isUploader
+          ? WORKFLOW_REVIEW_ENABLED 
+            ? `Your document "${fileTitle}" (${verTag}) has been uploaded successfully and submitted for workflow review.`
+            : `Your document "${fileTitle}" (${verTag}) has been uploaded successfully and saved to the repository.`
+          : `A new document "${fileTitle}" (${verTag}) was uploaded by ${req.user.name} and is available in the repository.`;
+
+        await sendNotification({
+          recipientId: targetUser.id,
+          senderId: req.user.id,
+          documentId: documentId,
+          organizationId: orgIdToUse,
+          title: notifTitle,
+          message: notifMessage,
+          type: isUploader ? 'DOCUMENT_UPLOAD_SUCCESS' : 'NEW_DOCUMENT_UPLOADED',
+          emailDetails: {
+            documentTitle: fileTitle,
+            documentVersion: verTag
+          }
+        });
+      }
+
+      // 4. Audit Log
+      await logAudit({
+        organization_id: orgIdToUse,
+        user_id: req.user.id,
+        action: 'DOCUMENT_UPLOADED',
+        document_id: documentId,
+        version: verTag,
+        comment: `Document '${fileTitle}' uploaded (SHA-256: ${fileHash.substring(0, 10)}...).`,
+        req
+      });
+
+      createdDocuments.push({
+        id: documentId,
+        title: fileTitle,
+        original_filename: file.originalname,
+        document_type: fileDocType,
+        version: verTag,
+        status: initialStatus
       });
     }
 
-    // 4. Audit Trail Log
-    await logAudit({
-      organization_id: orgIdToUse,
-      user_id: req.user.id,
-      action: 'DOCUMENT_UPLOADED',
-      document_id: documentId,
-      version: verTag,
-      comment: `Document '${title.trim()}' uploaded (SHA-256: ${fileHash.substring(0, 10)}...).`,
-      req
-    });
-
     return res.status(201).json({
       success: true,
-      message: WORKFLOW_REVIEW_ENABLED 
-        ? 'Document uploaded successfully and routed to Stage 1 Reviewer.' 
-        : 'Document uploaded successfully and saved to repository.',
-      documentId,
+      message: createdDocuments.length === 1
+        ? (WORKFLOW_REVIEW_ENABLED 
+            ? 'Document uploaded successfully and routed to Stage 1 Reviewer.' 
+            : 'Document uploaded successfully and saved to repository.')
+        : `${createdDocuments.length} documents uploaded successfully and routed to Stage 1 Reviewer.`,
+      documentId: createdDocuments[0]?.id,
+      documents: createdDocuments,
+      count: createdDocuments.length,
       version: verTag,
       status: initialStatus
     });
   } catch (err) {
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
-    }
+    cleanUploadedFiles();
     console.error('Document Upload Error:', err);
     return res.status(500).json({ success: false, message: err.message || 'An error occurred during upload.' });
   }
@@ -305,6 +366,9 @@ async function getDocuments(req, res) {
       params.push(req.query.organization_id);
     }
 
+    // Active documents filter (exclude soft-deleted)
+    whereClauses.push('(d.is_deleted = 0 OR d.is_deleted IS NULL)');
+
     // Folder filter (includes target folder AND any nested child subfolders)
     if (req.query.folder_id) {
       if (req.query.folder_id === 'uncategorized') {
@@ -329,7 +393,7 @@ async function getDocuments(req, res) {
       }
     }
 
-    // Status filter (supports comma-separated list like PENDING_REVIEW_1,PENDING_REVIEW_2)
+    // Status filter (supports comma-separated list like PENDING_REVIEW_1,PENDING_REVIEW_2 or status_not=ARCHIVED)
     if (req.query.status) {
       const statuses = req.query.status.split(',').map(s => s.trim());
       if (statuses.length === 1) {
@@ -340,6 +404,14 @@ async function getDocuments(req, res) {
         whereClauses.push(`d.status IN (${placeholders})`);
         params.push(...statuses);
       }
+    } else if (req.query.status_not) {
+      const notStatuses = req.query.status_not.split(',').map(s => s.trim());
+      const placeholders = notStatuses.map(() => '?').join(',');
+      whereClauses.push(`(d.status NOT IN (${placeholders}) OR d.status IS NULL)`);
+      params.push(...notStatuses);
+    } else {
+      // Default: Active documents view excludes ARCHIVED documents
+      whereClauses.push("(d.status != 'ARCHIVED' OR d.status IS NULL)");
     }
 
     // Document Type filter (PDF, WORD, EXCEL, POWERPOINT, IMAGE)
@@ -354,6 +426,16 @@ async function getDocuments(req, res) {
       params.push(req.query.category);
     }
 
+    // Date Range filter (From Date to To Date)
+    if (req.query.from_date) {
+      whereClauses.push('d.created_at >= ?');
+      params.push(`${req.query.from_date.trim()} 00:00:00`);
+    }
+    if (req.query.to_date) {
+      whereClauses.push('d.created_at <= ?');
+      params.push(`${req.query.to_date.trim()} 23:59:59`);
+    }
+
     // Search filter
     if (req.query.search) {
       whereClauses.push('(LOWER(d.title) LIKE LOWER(?) OR LOWER(d.description) LIKE LOWER(?))');
@@ -365,10 +447,34 @@ async function getDocuments(req, res) {
       sql += ' WHERE ' + whereClauses.join(' AND ');
     }
 
+    // Compute total matching document count before pagination
+    let countSql = 'SELECT COUNT(DISTINCT d.id) as total_count FROM documents d';
+    if (whereClauses.length > 0) {
+      countSql += ' WHERE ' + whereClauses.join(' AND ');
+    }
+    const countRes = await db.query(countSql, params);
+    const totalCount = countRes[0] ? (countRes[0].total_count || 0) : 0;
+
     sql += ' ORDER BY d.id DESC';
 
+    const isLimitAll = req.query.limit === 'all' || req.query.pagination === 'false';
+    const limit = isLimitAll ? null : (req.query.limit ? parseInt(req.query.limit) : 30);
+    const offset = isLimitAll ? 0 : (req.query.offset ? parseInt(req.query.offset) : (req.query.page ? (parseInt(req.query.page) - 1) * (limit || 30) : 0));
+
+    if (limit !== null && limit > 0) {
+      sql += ' LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+    }
+
     const documents = await db.query(sql, params);
-    return res.json({ success: true, documents });
+    return res.json({ 
+      success: true, 
+      documents,
+      total: totalCount,
+      limit: limit || documents.length,
+      offset: offset,
+      hasMore: limit !== null ? (offset + documents.length < totalCount) : false
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -425,6 +531,30 @@ async function getDocumentById(req, res) {
        ORDER BY r.id ASC`,
       [id]
     );
+
+    // Build folder trail and full path for nano horizontal bar
+    let folderTrail = [];
+    const targetFolderId = doc.folder_id || doc.original_folder_id;
+    if (targetFolderId) {
+      let currId = parseInt(targetFolderId);
+      const visited = new Set();
+      while (currId && !visited.has(currId)) {
+        visited.add(currId);
+        const folderRows = await db.query('SELECT id, name, parent_id FROM folders WHERE id = ?', [currId]);
+        const folder = folderRows[0];
+        if (!folder) break;
+        if (!folder.parent_id && ['BIKRAMSHILA', 'BKS'].includes((folder.name || '').trim().toUpperCase())) {
+          break;
+        }
+        folderTrail.unshift(folder);
+        currId = folder.parent_id;
+      }
+    }
+
+    doc.folder_trail = folderTrail;
+    doc.folder_path = folderTrail.length > 0 
+      ? `Bikramshila Drive / ${folderTrail.map(f => f.name).join(' / ')}` 
+      : (doc.organization_id === 2 ? 'Bikramshila Drive / IRCON' : 'Bikramshila Drive / RAHEE');
 
     // Record Audit View Event
     await logAudit({
@@ -1422,15 +1552,19 @@ async function triggerArchivalPolicy(req, res) {
   }
 }
 
-// Manual Archive Document (Super Admin ONLY)
+// Manual Archive Document (Super Admin Rajib Ghosh ONLY)
 async function archiveDocument(req, res) {
   try {
     const { id } = req.params;
 
-    if (!req.user.is_super_admin) {
+    const userEmail = req.user.email?.toLowerCase() || '';
+    const userName = req.user.name?.toLowerCase() || '';
+    const isRajibGhosh = userEmail === 'rajib.g@rahee.com' || userName.includes('rajib ghosh') || req.user.is_super_admin || req.user.role_id === 1 || req.user.id === 11;
+
+    if (!isRajibGhosh) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden: Manual document archival is strictly restricted to Super Admin ONLY.'
+        message: 'Forbidden: Document archival is strictly restricted to Super Admin (Rajib Ghosh) only. Other users cannot archive documents.'
       });
     }
 
@@ -1504,15 +1638,19 @@ async function archiveDocument(req, res) {
   }
 }
 
-// Restore / Unarchive an Archived Document (Super Admin ONLY)
+// Restore / Unarchive an Archived Document (Super Admin Rajib Ghosh ONLY)
 async function restoreDocument(req, res) {
   try {
     const { id } = req.params;
 
-    if (!req.user.is_super_admin) {
+    const userEmail = req.user.email?.toLowerCase() || '';
+    const userName = req.user.name?.toLowerCase() || '';
+    const isRajibGhosh = userEmail === 'rajib.g@rahee.com' || userName.includes('rajib ghosh') || req.user.is_super_admin || req.user.role_id === 1 || req.user.id === 11;
+
+    if (!isRajibGhosh) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden: Document restoration from archive is strictly restricted to Super Admin ONLY.'
+        message: 'Forbidden: Document restoration from archive is strictly restricted to Super Admin (Rajib Ghosh) only. Company Admins (Rahul Dey, Om Jha) cannot restore archived documents.'
       });
     }
 
@@ -1590,15 +1728,41 @@ async function restoreDocument(req, res) {
   }
 }
 
-// Delete Document (Strictly Restricted to Super Admin ONLY)
+// Delete Document (Restricted to Rahul Dey / Rahee Admin, Ircon Admin, and Super Admin)
 async function deleteDocument(req, res) {
   try {
     const { id } = req.params;
+    const userEmail = req.user.email?.toLowerCase() || '';
+    const userName = req.user.name?.toLowerCase() || '';
+    const userRole = req.user.role_name || '';
+    const isSuperAdmin = req.user.is_super_admin || req.user.role_id === 1 || userRole === 'SUPER_ADMIN';
 
-    if (!req.user.is_super_admin) {
+    // Rahul Dey specifically & Rahee Admin
+    const isRahulDey = userEmail === 'rahul.d@rahee.com' || userName.includes('rahul dey') || req.user.id === 5;
+    const isRaheeAdmin = isRahulDey || ((req.user.organization_id === 1 || req.user.organization_code === 'RAHEE' || userEmail.includes('@rahee.com')) && (
+      [2, 3].includes(req.user.role_id) ||
+      ['RAHEE_ADMIN', 'RAHEE_ADMIN_REVIEWER', 'RAHEE_EXEC_ADMIN'].includes(userRole) ||
+      req.user.designation === 'Admin' ||
+      userEmail.startsWith('rahul.d@') ||
+      userEmail.startsWith('s.mondal@') ||
+      req.user.permissions?.includes('delete') ||
+      req.user.permissions?.includes('delete_document')
+    ));
+
+    // Ircon Admin: Om Jha, Role 8, IRCON_ADMIN, IRCON_ADMIN_REVIEWER, or Ircon user with Admin designation
+    const isIrconAdmin = (req.user.organization_id === 2 || req.user.organization_code === 'IRCON' || userEmail.includes('@ircon.org')) && (
+      [8].includes(req.user.role_id) ||
+      ['IRCON_ADMIN', 'IRCON_ADMIN_REVIEWER'].includes(userRole) ||
+      req.user.designation === 'Admin' ||
+      userEmail.startsWith('om.jha@') ||
+      req.user.permissions?.includes('delete') ||
+      req.user.permissions?.includes('delete_document')
+    );
+
+    if (!isSuperAdmin && !isRahulDey && !isRaheeAdmin && !isIrconAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Forbidden: Under system security policy, ONLY the Super Admin is authorized to delete documents.'
+        message: 'Forbidden: Document deletion is restricted to Rahul Dey (Rahee Admin), Ircon Admin, and Super Admin.'
       });
     }
 
@@ -1608,20 +1772,37 @@ async function deleteDocument(req, res) {
       return res.status(404).json({ success: false, message: 'Document not found.' });
     }
 
-    // Delete document versions, reviews, and main record
-    await db.query('DELETE FROM document_versions WHERE document_id = ?', [id]);
-    await db.query('DELETE FROM document_reviews WHERE document_id = ?', [id]);
-    await db.query('DELETE FROM documents WHERE id = ?', [id]);
+    // Tenant Isolation Check for Company Admins (cannot delete another company's document)
+    if (!isSuperAdmin && !isRahulDey && doc.organization_id && req.user.organization_id && parseInt(doc.organization_id) !== parseInt(req.user.organization_id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: You cannot delete a document belonging to another organization.'
+      });
+    }
+
+    // Soft delete document: move to Recycle Bin
+    await db.query(
+      `UPDATE documents 
+       SET is_deleted = 1, 
+           deleted_at = NOW(), 
+           deleted_by = ?, 
+           original_folder_id = COALESCE(folder_id, original_folder_id) 
+       WHERE id = ?`,
+      [req.user.id, id]
+    );
 
     await logAudit({
       organization_id: doc.organization_id,
       user_id: req.user.id,
       action: 'DOCUMENT_DELETED',
-      comment: `Deleted document '${doc.title}' (ID: ${id}).`,
+      comment: `Document '${doc.title}' (ID: ${id}) moved to Recycle Bin by ${req.user.name}.`,
       req
     });
 
-    return res.json({ success: true, message: `Document '${doc.title}' deleted successfully.` });
+    return res.json({ 
+      success: true, 
+      message: `Document '${doc.title}' moved to Recycle Bin. Super Admin (Rajib Ghosh) can restore it at any time.` 
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

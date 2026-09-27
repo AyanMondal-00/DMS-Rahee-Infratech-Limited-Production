@@ -196,10 +196,64 @@ async function deleteUser(req, res) {
   }
 }
 
+async function resetUserPassword(req, res) {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+    const targetId = parseInt(id);
+
+    // Strict Rule: Password reset is exclusively restricted to Super Admin (Rajib Ghosh)
+    if (!req.user.is_super_admin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: User password reset is strictly restricted to the Global Super Admin ONLY.'
+      });
+    }
+
+    if (!password || password.trim().length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long.'
+      });
+    }
+
+    const targetUsers = await db.query('SELECT id, name, email, organization_id FROM users WHERE id = ?', [targetId]);
+    const targetUser = targetUsers[0];
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User account not found.' });
+    }
+
+    // Hash new password
+    const password_hash = await bcrypt.hash(password.trim(), 10);
+
+    // Update password and clear any failed login lockouts
+    await db.query(
+      'UPDATE users SET password_hash = ?, failed_login_attempts = 0, lockout_until = NULL WHERE id = ?',
+      [password_hash, targetId]
+    );
+
+    // Audit log
+    await logAudit({
+      organization_id: targetUser.organization_id || 1,
+      action: 'USER_PASSWORD_RESET',
+      comment: `Password reset by Super Admin for user account '${targetUser.email}' (${targetUser.name}).`,
+      req
+    });
+
+    return res.json({
+      success: true,
+      message: `Password for user '${targetUser.name}' (${targetUser.email}) has been successfully reset.`
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 module.exports = {
   getUsers,
   createUser,
   updateUserStatus,
   getRoles,
-  deleteUser
+  deleteUser,
+  resetUserPassword
 };

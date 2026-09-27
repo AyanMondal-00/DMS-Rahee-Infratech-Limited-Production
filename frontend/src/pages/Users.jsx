@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Users as UsersIcon, Plus, UserCheck, UserX, Shield, Building2, X, AlertCircle } from 'lucide-react';
+import { Users as UsersIcon, Plus, UserCheck, UserX, Shield, Building2, X, AlertCircle, KeyRound, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 
 export default function Users() {
   const { user, hasPermission } = useAuth();
@@ -17,6 +17,17 @@ export default function Users() {
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Reset Password State
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [selectedUserForReset, setSelectedUserForReset] = useState(null);
+  const [newResetPassword, setNewResetPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
 
   // New User Form State
   const [name, setName] = useState('');
@@ -119,6 +130,49 @@ export default function Users() {
     }
   };
 
+  const handleOpenResetModal = (targetUser) => {
+    setSelectedUserForReset(targetUser);
+    setNewResetPassword('');
+    setConfirmResetPassword('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setResetError('');
+    setResetSuccess('');
+    setShowResetModal(true);
+  };
+
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setResetError('');
+    setResetSuccess('');
+
+    if (!newResetPassword || newResetPassword.length < 6) {
+      setResetError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newResetPassword !== confirmResetPassword) {
+      setResetError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    try {
+      setResetSubmitting(true);
+      const res = await api.put(`/users/${selectedUserForReset.id}/reset-password`, {
+        password: newResetPassword
+      });
+      setResetSubmitting(false);
+      setResetSuccess(res.data?.message || `Password for ${selectedUserForReset.name} has been reset successfully!`);
+      setTimeout(() => {
+        setShowResetModal(false);
+        setResetSuccess('');
+      }, 1600);
+    } catch (err) {
+      setResetSubmitting(false);
+      setResetError(err.response?.data?.message || 'Failed to reset password.');
+    }
+  };
+
   const resetCreateForm = () => {
     setName('');
     setEmail('');
@@ -183,6 +237,7 @@ export default function Users() {
                   <th className="py-3.5 px-4">Organization</th>
                   <th className="py-3.5 px-4">Function / Designation</th>
                   <th className="py-3.5 px-4">Document Capability</th>
+                  <th className="py-3.5 px-4">Password</th>
                   <th className="py-3.5 px-4">Account Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -243,6 +298,21 @@ export default function Users() {
                           <span className="inline-flex items-center space-x-1 px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-md text-xs border border-slate-200">
                             <span>👁️ Viewer</span>
                           </span>
+                        )}
+                      </td>
+
+                      {/* Password Action Column */}
+                      <td className="py-3.5 px-4">
+                        {user?.is_super_admin && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenResetModal(u)}
+                            className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 hover:text-amber-900 border border-amber-300 rounded-lg font-bold text-[11px] shadow-2xs transition active:scale-95"
+                            title={`Reset password for ${u.name}`}
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Reset Password</span>
+                          </button>
                         )}
                       </td>
 
@@ -450,6 +520,153 @@ export default function Users() {
         </div>
       )}
 
+      {/* Reset Password Modal (Super Admin Only) */}
+      {showResetModal && selectedUserForReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col border border-slate-200 overflow-hidden">
+            
+            {/* Header */}
+            <div className="px-6 py-4 bg-slate-800 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/30">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight text-white">Reset User Password</h3>
+                  <p className="text-[11px] text-slate-400">Super Administrator Override</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!resetSubmitting) setShowResetModal(false);
+                }}
+                className="p-1 text-slate-400 hover:text-white rounded-lg transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Target User Summary Card */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center space-x-3 text-xs">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-800 font-black flex items-center justify-center text-sm uppercase shrink-0 border border-blue-200">
+                {selectedUserForReset.name ? selectedUserForReset.name.charAt(0) : 'U'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-slate-900 truncate">{selectedUserForReset.name}</p>
+                <p className="text-[11px] text-blue-600 font-mono truncate">{selectedUserForReset.email}</p>
+                <div className="flex items-center space-x-2 mt-1">
+                  <span className="inline-block px-2 py-0.5 bg-slate-200 text-slate-700 font-semibold rounded text-[10px]">
+                    {selectedUserForReset.organization_name || 'Global System'}
+                  </span>
+                  <span className="inline-block px-2 py-0.5 bg-indigo-50 text-indigo-700 font-semibold rounded text-[10px] border border-indigo-200">
+                    {selectedUserForReset.designation || selectedUserForReset.role_name}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleResetPasswordSubmit} className="p-6 space-y-4 text-xs">
+              {resetError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 font-semibold rounded-xl flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{resetError}</span>
+                </div>
+              )}
+
+              {resetSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold rounded-xl flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{resetSuccess}</span>
+                </div>
+              )}
+
+              {/* New Password Input */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  New Password (*)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newResetPassword}
+                    onChange={(e) => setNewResetPassword(e.target.value)}
+                    required
+                    placeholder="Enter new password (min. 6 characters)"
+                    className="w-full p-2.5 pr-10 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm New Password Input */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  Confirm New Password (*)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmResetPassword}
+                    onChange={(e) => setConfirmResetPassword(e.target.value)}
+                    required
+                    placeholder="Re-type new password"
+                    className="w-full p-2.5 pr-10 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+                💡 <span className="font-bold">Security Note:</span> Resetting this password takes effect immediately and clears any active login lockouts for this account.
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  disabled={resetSubmitting}
+                  onClick={() => setShowResetModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetSubmitting || !newResetPassword || !confirmResetPassword}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-sm transition disabled:opacity-50 flex items-center space-x-1.5"
+                >
+                  {resetSubmitting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>Set New Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+

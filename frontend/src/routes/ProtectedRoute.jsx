@@ -9,7 +9,7 @@ export default function ProtectedRoute() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white text-xs">
+      <div className="h-screen bg-slate-950 flex items-center justify-center text-white text-xs">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3"></div>
         Loading Enterprise DMS Session...
       </div>
@@ -21,12 +21,14 @@ export default function ProtectedRoute() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-800">
+    <div className="h-screen w-screen bg-slate-100 flex flex-col font-sans text-slate-800 overflow-hidden">
       <Navbar />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         <Sidebar />
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
-          <Outlet />
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full h-full">
+          <div className="max-w-7xl mx-auto w-full pb-12">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

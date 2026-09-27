@@ -25,7 +25,7 @@ const handleUpload = (multerMiddleware) => (req, res, next) => {
 
 // Document upload & list
 router.get('/', documentController.getDocuments);
-router.post('/', requirePermission('upload'), handleUpload(upload.single('file')), documentController.uploadDocument);
+router.post('/', requirePermission('upload'), handleUpload(upload.any()), documentController.uploadDocument);
 
 // Document detail, preview, download
 router.get('/:id', documentController.getDocumentById);

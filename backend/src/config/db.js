@@ -371,6 +371,33 @@ async function createTables() {
   } catch (e) {
     console.warn('Folder permissions migration check warning:', e.message);
   }
+
+  // Migration: Add delete permission (Permission ID 12) for Rahul Dey (Rahee Admin) & Ircon Admin
+  try {
+    const existingDeletePerm = await query("SELECT * FROM permissions WHERE code = 'delete' OR code = 'delete_document'");
+    if (!existingDeletePerm || existingDeletePerm.length === 0) {
+      await query("INSERT INTO permissions (id, code, description) VALUES (12, 'delete', 'Allows deleting documents and versions')");
+    }
+    // Grant delete permission explicitly to Roles: 1 (Super Admin), 2 (Rahul Dey - Rahee Admin Reviewer), 3 (Rahee Exec Admin), 8 (Ircon Admin)
+    for (const roleId of [1, 2, 3, 8]) {
+      try {
+        await query('INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (?, 12)', [roleId]);
+      } catch (rpErr) {}
+    }
+  } catch (e) {
+    console.warn('Delete permission migration warning:', e.message);
+  }
+
+  // Migration: Add soft delete and recycle bin tracking columns
+  try { await query('ALTER TABLE folders ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch (e) {}
+  try { await query('ALTER TABLE folders ADD COLUMN deleted_at DATETIME DEFAULT NULL'); } catch (e) {}
+  try { await query('ALTER TABLE folders ADD COLUMN deleted_by INTEGER DEFAULT NULL'); } catch (e) {}
+  try { await query('ALTER TABLE folders ADD COLUMN original_parent_id INTEGER DEFAULT NULL'); } catch (e) {}
+
+  try { await query('ALTER TABLE documents ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch (e) {}
+  try { await query('ALTER TABLE documents ADD COLUMN deleted_at DATETIME DEFAULT NULL'); } catch (e) {}
+  try { await query('ALTER TABLE documents ADD COLUMN deleted_by INTEGER DEFAULT NULL'); } catch (e) {}
+  try { await query('ALTER TABLE documents ADD COLUMN original_folder_id INTEGER DEFAULT NULL'); } catch (e) {}
 }
 
 async function seedInitialData() {

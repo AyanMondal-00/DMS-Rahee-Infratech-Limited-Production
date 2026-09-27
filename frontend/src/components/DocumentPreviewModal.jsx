@@ -33,10 +33,22 @@ export default function DocumentPreviewModal({ isOpen, onClose, document, onDown
           }
           setLoading(false);
         })
-        .catch((err) => {
+        .catch(async (err) => {
           if (!active) return;
           console.error('Document preview error:', err);
-          setError(err.response?.data?.message || 'Unable to stream document preview.');
+          let errorMsg = 'Unable to stream document preview.';
+          if (err.response?.data instanceof Blob) {
+            try {
+              const errorText = await err.response.data.text();
+              const parsed = JSON.parse(errorText);
+              if (parsed.message) errorMsg = parsed.message;
+            } catch (e) {}
+          } else if (err.response?.data?.message) {
+            errorMsg = err.response.data.message;
+          } else if (err.message) {
+            errorMsg = err.message;
+          }
+          setError(errorMsg);
           setLoading(false);
         });
     }

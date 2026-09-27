@@ -11,6 +11,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const reportRoutes = require('./routes/report.routes');
 const folderRoutes = require('./routes/folder.routes');
 const auditRoutes = require('./routes/audit.routes');
+const recycleBinRoutes = require('./routes/recycleBin.routes');
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/audit-logs', auditRoutes);
+app.use('/api/recycle-bin', recycleBinRoutes);
 
 // 404 Route Handler
 app.use((req, res) => {

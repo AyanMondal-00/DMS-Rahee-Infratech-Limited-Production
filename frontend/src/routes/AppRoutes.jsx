@@ -12,6 +12,7 @@ import Organizations from '../pages/Organizations';
 import EmailActivity from '../pages/EmailActivity';
 import AuditLogs from '../pages/AuditLogs';
 import Reports from '../pages/Reports';
+import RecycleBin from '../pages/RecycleBin';
 
 export default function AppRoutes() {
   return (
@@ -27,6 +28,7 @@ export default function AppRoutes() {
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/users" element={<Users />} />
         <Route path="/organizations" element={<Organizations />} />
+        <Route path="/recycle-bin" element={<RecycleBin />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/emails" element={<EmailActivity />} />
         <Route path="/audit-logs" element={<AuditLogs />} />
