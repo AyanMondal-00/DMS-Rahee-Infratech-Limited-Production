@@ -1,3 +1,7 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
@@ -61,8 +65,8 @@ async function initDatabase() {
   await seedBksFolders();
   try {
     await query("UPDATE users SET role_id = 6 WHERE email = 'shardu.rastogi@ircon.org'");
-    await query("INSERT INTO role_permissions (role_id, permission_id) VALUES (7, 9)");
-    await query("INSERT INTO role_permissions (role_id, permission_id) VALUES (7, 10)");
+    await query("INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (7, 9)");
+    await query("INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (7, 10)");
   } catch (e) {}
 }
 
@@ -398,6 +402,14 @@ async function createTables() {
   try { await query('ALTER TABLE documents ADD COLUMN deleted_at DATETIME DEFAULT NULL'); } catch (e) {}
   try { await query('ALTER TABLE documents ADD COLUMN deleted_by INTEGER DEFAULT NULL'); } catch (e) {}
   try { await query('ALTER TABLE documents ADD COLUMN original_folder_id INTEGER DEFAULT NULL'); } catch (e) {}
+
+  // Performance Indexes
+  try { await query('CREATE INDEX idx_docs_org_status ON documents(organization_id, status, is_deleted)'); } catch (e) {}
+  try { await query('CREATE INDEX idx_docs_folder ON documents(folder_id, is_deleted)'); } catch (e) {}
+  try { await query('CREATE INDEX idx_folders_parent ON folders(parent_id, is_deleted)'); } catch (e) {}
+  try { await query('CREATE INDEX idx_doc_versions_doc_id ON document_versions(document_id)'); } catch (e) {}
+  try { await query('CREATE INDEX idx_notif_recipient ON notifications(recipient_id, is_read)'); } catch (e) {}
+  try { await query('CREATE INDEX idx_audit_org_user ON audit_logs(organization_id, user_id)'); } catch (e) {}
 }
 
 async function seedInitialData() {

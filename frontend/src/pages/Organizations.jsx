@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { useNotification } from '../context/NotificationContext';
 import { Building2, Plus, X, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export default function Organizations() {
+  const { showAlert, showConfirm } = useNotification();
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -43,6 +45,11 @@ export default function Organizations() {
       setSubmitting(false);
       setShowModal(false);
       setName('');
+      showAlert({
+        title: 'Tenant Created',
+        message: `Organization "${name.trim()}" has been registered successfully.`,
+        type: 'success'
+      });
       fetchOrgs();
     } catch (err) {
       setSubmitting(false);
@@ -52,13 +59,29 @@ export default function Organizations() {
 
   const toggleStatus = async (org) => {
     const newStatus = org.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    if (!window.confirm(`Are you sure you want to change status of ${org.name} to ${newStatus}?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Update Tenant Status',
+      message: `Are you sure you want to change the status of ${org.name} to ${newStatus}?`,
+      confirmText: `Set ${newStatus}`,
+      isDanger: newStatus === 'INACTIVE'
+    });
+
+    if (!confirmed) return;
 
     try {
       await api.patch(`/organizations/${org.id}/status`, { status: newStatus });
+      showAlert({
+        title: 'Status Updated',
+        message: `${org.name} status changed to ${newStatus}.`,
+        type: 'success'
+      });
       fetchOrgs();
     } catch (err) {
-      alert('Failed: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Operation Failed',
+        message: 'Failed to update tenant status: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
@@ -74,7 +97,7 @@ export default function Organizations() {
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition"
+          className="flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition active:scale-98 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Add Tenant Organization</span>
@@ -87,7 +110,7 @@ export default function Organizations() {
           <div className="col-span-full p-12 text-center text-xs text-slate-500">Loading tenants...</div>
         ) : (
           orgs.map((o) => (
-            <div key={o.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div key={o.id} className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                   <Building2 className="w-5 h-5" />
@@ -108,7 +131,7 @@ export default function Organizations() {
                 <span className="text-slate-400 font-mono text-[10px]">ID: #{o.id}</span>
                 <button
                   onClick={() => toggleStatus(o)}
-                  className="text-xs font-bold text-slate-600 hover:text-slate-900 underline"
+                  className="text-xs font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
                 >
                   Set {o.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'}
                 </button>
@@ -120,11 +143,11 @@ export default function Organizations() {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
             <div className="px-6 py-4 bg-slate-800 text-white flex items-center justify-between">
               <h3 className="font-bold text-base">Register New Tenant</h3>
-              <button onClick={() => setShowModal(false)} className="p-1 text-slate-400 hover:text-white">
+              <button onClick={() => setShowModal(false)} className="p-1 text-slate-400 hover:text-white rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -154,14 +177,14 @@ export default function Organizations() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-semibold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-sm"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-sm transition"
                 >
                   {submitting ? 'Registering...' : 'Create Tenant'}
                 </button>

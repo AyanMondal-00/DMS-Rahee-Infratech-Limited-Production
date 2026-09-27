@@ -97,7 +97,10 @@ async function getDashboardMetrics(req, res) {
 
     // 9. Total Folders Count (Isolated by Tenant for Company Users, Combined for Super Admin)
     const allActiveFolders = await db.query(
-      'SELECT id, name, organization_id, parent_id FROM folders WHERE (is_deleted = 0 OR is_deleted IS NULL)'
+      `SELECT f.id, f.name, f.organization_id, f.parent_id, o.code as organization_code 
+       FROM folders f 
+       LEFT JOIN organizations o ON f.organization_id = o.id 
+       WHERE (f.is_deleted = 0 OR f.is_deleted IS NULL)`
     );
 
     // Filter out root Bikramshila drive node

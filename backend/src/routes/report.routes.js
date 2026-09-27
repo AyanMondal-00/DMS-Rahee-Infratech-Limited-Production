@@ -6,5 +6,7 @@ const { authenticateToken } = require('../middleware/auth.middleware');
 router.use(authenticateToken);
 
 router.get('/dashboard', reportController.getDashboardMetrics);
+router.get('/dashboard-metrics', reportController.getDashboardMetrics);
+router.get('/metrics', reportController.getDashboardMetrics);
 
 module.exports = router;

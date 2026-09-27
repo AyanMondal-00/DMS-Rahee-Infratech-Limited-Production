@@ -458,8 +458,8 @@ async function getDocuments(req, res) {
     sql += ' ORDER BY d.id DESC';
 
     const isLimitAll = req.query.limit === 'all' || req.query.pagination === 'false';
-    const limit = isLimitAll ? null : (req.query.limit ? parseInt(req.query.limit) : 30);
-    const offset = isLimitAll ? 0 : (req.query.offset ? parseInt(req.query.offset) : (req.query.page ? (parseInt(req.query.page) - 1) * (limit || 30) : 0));
+    const limit = isLimitAll ? null : Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 30));
+    const offset = isLimitAll ? 0 : Math.max(0, parseInt(req.query.offset, 10) || (req.query.page ? (Math.max(1, parseInt(req.query.page, 10)) - 1) * (limit || 30) : 0));
 
     if (limit !== null && limit > 0) {
       sql += ' LIMIT ? OFFSET ?';

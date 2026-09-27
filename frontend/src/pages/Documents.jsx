@@ -40,11 +40,13 @@ import {
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { getFormattedFolderList } from '../utils/folderUtils';
 import FolderTreeSelect from '../components/FolderTreeSelect';
 
 export default function Documents() {
   const { user, hasPermission } = useAuth();
+  const { showAlert, showConfirm } = useNotification();
   const [documents, setDocuments] = useState([]);
   const [totalDocumentsCount, setTotalDocumentsCount] = useState(0);
   const [hasMoreDocuments, setHasMoreDocuments] = useState(false);
@@ -684,7 +686,11 @@ export default function Documents() {
       setSavingPermissions(false);
       setShowAccessModal(false);
       fetchFolders();
-      alert(`Folder '${editingFolder.name}' settings and access control permissions updated successfully.`);
+      showAlert({
+        title: 'Folder Access Updated',
+        message: `Folder '${editingFolder.name}' settings and access control permissions updated successfully.`,
+        type: 'success'
+      });
     } catch (err) {
       setSavingPermissions(false);
       setAccessModalMessage(err.response?.data?.message || 'Failed to update folder settings.');
@@ -693,9 +699,13 @@ export default function Documents() {
 
   const handleRunArchivalPolicy = async () => {
     const scopeMessage = selectedFolderId ? 'all active documents in the currently selected folder' : 'all active documents across the repository';
-    if (!window.confirm(`Execute Bikramshila Manual Document Archival Policy now? This will move ${scopeMessage} to Archive.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Run Archival Policy',
+      message: `Execute Bikramshila Manual Document Archival Policy now? This will move ${scopeMessage} to Archive.`,
+      confirmText: 'Execute Archival',
+      isDanger: false
+    });
+    if (!confirmed) return;
 
     try {
       setRunningArchival(true);
@@ -704,12 +714,20 @@ export default function Documents() {
       });
       setRunningArchival(false);
       if (res.data.success) {
-        alert(`Bikramshila Manual Document Archival Policy Executed Successfully!\n\nDocuments Archived: ${res.data.archivedCount}\n${res.data.archivedDocTitles?.length > 0 ? `Archived Files:\n- ${res.data.archivedDocTitles.join('\n- ')}` : 'No active documents were found to archive.'}`);
+        showAlert({
+          title: 'Archival Policy Completed',
+          message: `Bikramshila Manual Document Archival Policy Executed Successfully!\n\nDocuments Archived: ${res.data.archivedCount}\n${res.data.archivedDocTitles?.length > 0 ? `Archived Files:\n- ${res.data.archivedDocTitles.join('\n- ')}` : 'No active documents were found to archive.'}`,
+          type: 'success'
+        });
         fetchDocuments();
       }
     } catch (err) {
       setRunningArchival(false);
-      alert('Failed to execute archival policy: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Archival Policy Failed',
+        message: 'Failed to execute archival policy: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
@@ -739,7 +757,11 @@ export default function Documents() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      alert('Failed to download document file. Please try again.');
+      showAlert({
+        title: 'Download Failed',
+        message: 'Failed to download document file. Please try again.',
+        type: 'error'
+      });
     }
   };
 
@@ -751,59 +773,106 @@ export default function Documents() {
         setHistoryVersions(res.data.versions);
       }
     } catch (err) {
-      alert('Failed to load version history: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Error',
+        message: 'Failed to load version history: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
   const handleDeleteDocument = async (doc) => {
     if (!canDeleteDocument(doc)) {
-      alert('Forbidden: Document deletion is restricted to Company Admins (Rahul Dey, Om Jha) and Super Admin (Rajib Ghosh).');
+      showAlert({
+        title: 'Access Restricted',
+        message: 'Forbidden: Document deletion is restricted to Company Admins (Rahul Dey, Om Jha) and Super Admin (Rajib Ghosh).',
+        type: 'error'
+      });
       return;
     }
-    if (!window.confirm(`Are you sure you want to move document "${doc.title}" to the Recycle Bin? Super Admin (Rajib Ghosh) can restore it to this exact directory at any time.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Document',
+      message: `Are you sure you want to move document "${doc.title}" to the Recycle Bin? Super Admin (Rajib Ghosh) can restore it to this exact directory at any time.`,
+      confirmText: 'Move to Recycle Bin',
+      isDanger: true
+    });
+    if (!confirmed) return;
+
     try {
       const res = await api.delete(`/documents/${doc.id}`);
       if (res.data.success) {
-        alert(res.data.message || `Document "${doc.title}" moved to Recycle Bin.`);
+        showAlert({
+          title: 'Document Moved to Recycle Bin',
+          message: res.data.message || `Document "${doc.title}" moved to Recycle Bin.`,
+          type: 'success'
+        });
         fetchDocuments();
         fetchFolders();
       }
     } catch (err) {
-      alert('Failed to delete document: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Deletion Failed',
+        message: 'Failed to delete document: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
   const handleDeleteFolder = async (folder) => {
     if (!canDeleteFolder(folder)) {
-      alert('Forbidden: Folder deletion is restricted to Rahul Dey, Rajib Ghosh, Om Jha, and Company Admins.');
+      showAlert({
+        title: 'Access Restricted',
+        message: 'Forbidden: Folder deletion is restricted to Rahul Dey, Rajib Ghosh, Om Jha, and Company Admins.',
+        type: 'error'
+      });
       return;
     }
-    if (!window.confirm(`Are you sure you want to move folder "${folder.name}" and its contents to the Recycle Bin? Super Admin (Rajib Ghosh) can restore it at any time.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Folder',
+      message: `Are you sure you want to move folder "${folder.name}" and its contents to the Recycle Bin? Super Admin (Rajib Ghosh) can restore it at any time.`,
+      confirmText: 'Move to Recycle Bin',
+      isDanger: true
+    });
+    if (!confirmed) return;
+
     try {
       const res = await api.delete(`/folders/${folder.id}`);
       if (res.data.success) {
-        alert(res.data.message || `Folder "${folder.name}" moved to Recycle Bin.`);
+        showAlert({
+          title: 'Folder Moved to Recycle Bin',
+          message: res.data.message || `Folder "${folder.name}" moved to Recycle Bin.`,
+          type: 'success'
+        });
         setShowAccessModal(false);
         fetchFolders();
         fetchDocuments();
       }
     } catch (err) {
-      alert('Failed to delete folder: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Deletion Failed',
+        message: 'Failed to delete folder: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
   const handleArchiveDocument = async (doc) => {
-    if (!window.confirm(`Are you sure you want to move document "${doc.title}" to Archive?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Archive Document',
+      message: `Are you sure you want to move document "${doc.title}" to Archive?`,
+      confirmText: 'Archive Document',
+      isDanger: false
+    });
+    if (!confirmed) return;
+
     try {
       const res = await api.post(`/documents/${doc.id}/archive`);
       if (res.data.success) {
-        alert(res.data.message);
+        showAlert({
+          title: 'Document Archived',
+          message: res.data.message || `Document "${doc.title}" has been moved to Archive.`,
+          type: 'success'
+        });
         // Immediately remove from current active list view
         setDocuments(prev => prev.filter(d => d.id !== doc.id));
         setTotalDocumentsCount(prev => Math.max(0, prev - 1));
@@ -811,18 +880,31 @@ export default function Documents() {
         fetchFolders();
       }
     } catch (err) {
-      alert('Failed to archive document: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Archival Failed',
+        message: 'Failed to archive document: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
   const handleRestoreDocument = async (doc) => {
-    if (!window.confirm(`Restore archived document "${doc.title}" back into active Bikramshila folder hierarchy?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Restore Document',
+      message: `Restore archived document "${doc.title}" back into active Bikramshila folder hierarchy?`,
+      confirmText: 'Restore Document',
+      isDanger: false
+    });
+    if (!confirmed) return;
+
     try {
       const res = await api.post(`/documents/${doc.id}/restore`);
       if (res.data.success) {
-        alert(res.data.message);
+        showAlert({
+          title: 'Document Restored',
+          message: res.data.message || `Document "${doc.title}" has been restored to active documents.`,
+          type: 'success'
+        });
         // Immediately remove from current archived list view
         setDocuments(prev => prev.filter(d => d.id !== doc.id));
         setTotalDocumentsCount(prev => Math.max(0, prev - 1));
@@ -830,7 +912,11 @@ export default function Documents() {
         fetchFolders();
       }
     } catch (err) {
-      alert('Failed to restore document: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Restoration Failed',
+        message: 'Failed to restore document: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 

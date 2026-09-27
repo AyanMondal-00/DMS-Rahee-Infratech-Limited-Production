@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
 import { 
   ArrowLeft, 
@@ -22,6 +23,7 @@ export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showAlert, showConfirm } = useNotification();
   const [document, setDocument] = useState(null);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,43 +108,73 @@ export default function DocumentDetail() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      alert('Failed to download document file. Please try again.');
+      showAlert({
+        title: 'Download Failed',
+        message: 'Failed to download document file. Please try again.',
+        type: 'error'
+      });
     }
   };
 
   const handleRestoreDocument = async () => {
-    if (!window.confirm(`Restore archived document "${document?.title}" back to Active Documents?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Restore Document',
+      message: `Restore archived document "${document?.title}" back to Active Documents?`,
+      confirmText: 'Restore Document',
+      isDanger: false
+    });
+    if (!confirmed) return;
+
     try {
       setRestoringDoc(true);
       const res = await api.post(`/documents/${id}/restore`);
       setRestoringDoc(false);
       if (res.data.success) {
-        alert(res.data.message);
+        showAlert({
+          title: 'Document Restored',
+          message: res.data.message || `Document "${document?.title}" has been restored.`,
+          type: 'success'
+        });
         fetchDocumentData();
       }
     } catch (err) {
       setRestoringDoc(false);
-      alert('Failed to restore document: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Restoration Failed',
+        message: 'Failed to restore document: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
   const handleArchiveDocument = async () => {
-    if (!window.confirm(`Are you sure you want to move document "${document?.title}" to Archive?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Archive Document',
+      message: `Are you sure you want to move document "${document?.title}" to Archive?`,
+      confirmText: 'Archive Document',
+      isDanger: false
+    });
+    if (!confirmed) return;
+
     try {
       setArchivingDoc(true);
       const res = await api.post(`/documents/${id}/archive`);
       setArchivingDoc(false);
       if (res.data.success) {
-        alert(res.data.message);
+        showAlert({
+          title: 'Document Archived',
+          message: res.data.message || `Document "${document?.title}" moved to archive.`,
+          type: 'success'
+        });
         fetchDocumentData();
       }
     } catch (err) {
       setArchivingDoc(false);
-      alert('Failed to archive document: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Archival Failed',
+        message: 'Failed to archive document: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
@@ -187,20 +219,37 @@ export default function DocumentDetail() {
 
   const handleDeleteDocument = async () => {
     if (!canDeleteDocument) {
-      alert('Forbidden: Document deletion is restricted to Company Admins and Super Admin.');
+      showAlert({
+        title: 'Access Restricted',
+        message: 'Forbidden: Document deletion is restricted to Company Admins and Super Admin.',
+        type: 'error'
+      });
       return;
     }
-    if (!window.confirm(`Are you sure you want to move document "${document?.title}" to Recycle Bin?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Document',
+      message: `Are you sure you want to move document "${document?.title}" to Recycle Bin?`,
+      confirmText: 'Move to Recycle Bin',
+      isDanger: true
+    });
+    if (!confirmed) return;
+
     try {
       const res = await api.delete(`/documents/${id}`);
       if (res.data.success) {
-        alert(res.data.message || `Document "${document?.title}" deleted successfully.`);
+        await showAlert({
+          title: 'Document Deleted',
+          message: res.data.message || `Document "${document?.title}" deleted successfully.`,
+          type: 'success'
+        });
         navigate('/documents');
       }
     } catch (err) {
-      alert('Failed to delete document: ' + (err.response?.data?.message || err.message));
+      showAlert({
+        title: 'Delete Failed',
+        message: 'Failed to delete document: ' + (err.response?.data?.message || err.message),
+        type: 'error'
+      });
     }
   };
 
@@ -312,7 +361,7 @@ export default function DocumentDetail() {
         <div className="flex items-center space-x-2 shrink-0">
           <button
             onClick={() => setShowPreview(true)}
-            className="flex items-center space-x-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs transition border border-blue-200"
+            className="flex items-center space-x-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs transition border border-blue-200 cursor-pointer"
           >
             <Eye className="w-4 h-4" />
             <span>Preview Document</span>
@@ -320,7 +369,7 @@ export default function DocumentDetail() {
 
           <button
             onClick={() => handleDownload(document)}
-            className="flex items-center space-x-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition shadow-sm"
+            className="flex items-center space-x-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition shadow-sm cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>Download</span>
@@ -330,7 +379,7 @@ export default function DocumentDetail() {
             <button
               onClick={handleArchiveDocument}
               disabled={archivingDoc}
-              className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-xl text-xs transition border border-amber-300"
+              className="p-2 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-xl text-xs transition border border-amber-300 cursor-pointer"
               title="Archive Document (Move to Archive List)"
             >
               <Archive className="w-4 h-4 text-amber-600" />
@@ -341,7 +390,7 @@ export default function DocumentDetail() {
             <button
               onClick={handleRestoreDocument}
               disabled={restoringDoc}
-              className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs transition border border-emerald-300"
+              className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl text-xs transition border border-emerald-300 cursor-pointer"
               title="Restore Document (Back from Archive)"
             >
               <RotateCcw className="w-4 h-4 text-emerald-600" />
@@ -351,7 +400,7 @@ export default function DocumentDetail() {
           {canDeleteDocument && (
             <button
               onClick={handleDeleteDocument}
-              className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200"
+              className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition border border-rose-200 cursor-pointer"
               title="Delete Document"
             >
               <Trash2 className="w-4 h-4 text-rose-600" />
