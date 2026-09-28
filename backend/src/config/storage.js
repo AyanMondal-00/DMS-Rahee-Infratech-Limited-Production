@@ -37,10 +37,54 @@ const CAD_EXTENSIONS = ['.dwg', '.dxf', '.stl', '.obj', '.step', '.stp', '.iges'
 
 const DANGEROUS_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.js', '.msi', '.vbs', '.com', '.scr', '.pif', '.dll', '.jar'];
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
+class StreamHashingDiskStorage {
+  constructor(opts) {
+    this.destination = opts.destination || uploadDir;
+    this.filename = opts.filename;
+  }
+
+  _handleFile(req, file, cb) {
+    const dest = typeof this.destination === 'function' ? this.destination(req, file) : this.destination;
+    
+    this.filename(req, file, (err, filename) => {
+      if (err) return cb(err);
+      const finalPath = path.join(dest, filename);
+      const outStream = fs.createWriteStream(finalPath, { highWaterMark: 1024 * 1024 });
+      const hash = crypto.createHash('sha256');
+
+      file.stream.on('data', chunk => {
+        hash.update(chunk);
+      });
+
+      file.stream.pipe(outStream);
+
+      outStream.on('error', err => {
+        cb(err);
+      });
+
+      outStream.on('finish', () => {
+        cb(null, {
+          destination: dest,
+          filename: filename,
+          path: finalPath,
+          size: outStream.bytesWritten,
+          fileHash: hash.digest('hex')
+        });
+      });
+    });
+  }
+
+  _removeFile(req, file, cb) {
+    if (file && file.path && fs.existsSync(file.path)) {
+      fs.unlink(file.path, cb);
+    } else {
+      cb(null);
+    }
+  }
+}
+
+const storage = new StreamHashingDiskStorage({
+  destination: uploadDir,
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname).toLowerCase();
@@ -70,15 +114,18 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({
   storage: storage,
-  fileFilter: fileFilter
-  // No artificial file size limits — storage is bounded only by available disk space
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024 * 1024, // 2GB individual file limit
+    fieldSize: 50 * 1024 * 1024        // 50MB metadata field limit
+  }
 });
 
-// Helper function to calculate SHA-256 file hash
+// Helper function to calculate SHA-256 file hash with high-throughput stream buffer (fallback)
 function calculateFileHash(filePath) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(filePath);
+    const stream = fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 });
     stream.on('data', data => hash.update(data));
     stream.on('end', () => resolve(hash.digest('hex')));
     stream.on('error', err => reject(err));

@@ -21,100 +21,61 @@ import { useAuth } from '../context/AuthContext';
 import { getFormattedFolderList } from '../utils/folderUtils';
 import FolderTreeSelect from '../components/FolderTreeSelect';
 
-// Dedicated Smooth Uploading Animation Overlay
+// Dedicated Smooth High-Speed Uploading Animation Overlay
 function UploadingAnimationModal({ loading, progress, stage, stats, totalFiles, documentType }) {
-  const [animStep, setAnimStep] = useState(0);
-
-  const STEPS = [
-    { label: 'Scanning & verifying document structure', detail: 'Parsing format headers and MIME compliance' },
-    { label: 'Computing parallel SHA-256 cryptographic signatures', detail: 'Generating tamper-proof audit verification hash' },
-    { label: 'Streaming multi-part encrypted payload', detail: 'Transferring file binary stream to Bikramshila storage' },
-    { label: 'Ingesting document records into database engine', detail: 'Creating document metadata & version control entries' },
-    { label: 'Routing workflow review notifications', detail: 'Dispatching real-time notifications to Stage 1 Reviewer' }
-  ];
-
-  useEffect(() => {
-    if (!loading) {
-      setAnimStep(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setAnimStep((prev) => (prev + 1) % STEPS.length);
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [loading]);
-
   if (!loading) return null;
 
   const isDone = stage === 'done';
-  const currentStep = isDone
-    ? { label: 'Ingestion verified and saved to repository', detail: 'All cryptographic checks passed' }
-    : stage === 'processing' 
-      ? (progress >= 98 ? STEPS[4] : STEPS[3]) 
-      : STEPS[animStep % 3];
-
   const loadedMB = (stats.loaded / 1024 / 1024).toFixed(2);
   const totalMB = (stats.total / 1024 / 1024).toFixed(2);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
       <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-6 text-white relative overflow-hidden">
         
         {/* Ambient Glowing Background */}
-        <div className={`absolute -top-24 -left-24 w-48 h-48 ${isDone ? 'bg-emerald-500/20' : 'bg-blue-500/20'} rounded-full blur-3xl pointer-events-none transition-colors duration-500`}></div>
-        <div className={`absolute -bottom-24 -right-24 w-48 h-48 ${isDone ? 'bg-teal-500/20' : 'bg-indigo-500/20'} rounded-full blur-3xl pointer-events-none transition-colors duration-500`}></div>
+        <div className={`absolute -top-24 -left-24 w-48 h-48 ${isDone ? 'bg-emerald-500/20' : 'bg-blue-500/20'} rounded-full blur-3xl pointer-events-none transition-colors duration-300`}></div>
+        <div className={`absolute -bottom-24 -right-24 w-48 h-48 ${isDone ? 'bg-teal-500/20' : 'bg-indigo-500/20'} rounded-full blur-3xl pointer-events-none transition-colors duration-300`}></div>
 
         {/* Dynamic Graphic Art Animation */}
-        <div className="relative w-32 h-32 mx-auto flex items-center justify-center">
+        <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
           {/* Outer Pulsing Radar Ring */}
           <div className={`absolute inset-0 rounded-full ${isDone ? 'bg-emerald-500/10 border-2 border-emerald-500/30' : 'bg-blue-500/10 border-2 border-blue-500/30'} animate-ping opacity-60`}></div>
           
           {/* Rotating Gradient Spinner Ring */}
           {!isDone ? (
-            <div className="absolute inset-1.5 rounded-full border-2 border-transparent border-t-blue-500 border-r-indigo-400 animate-spin"></div>
+            <div className="absolute inset-1 rounded-full border-2 border-transparent border-t-blue-500 border-r-indigo-400 animate-spin"></div>
           ) : (
-            <div className="absolute inset-1.5 rounded-full border-2 border-emerald-400/60 shadow-lg shadow-emerald-500/20"></div>
+            <div className="absolute inset-1 rounded-full border-2 border-emerald-400/60 shadow-lg shadow-emerald-500/20"></div>
           )}
           
           {/* Inner Glowing Disk */}
-          <div className={`w-24 h-24 rounded-full ${isDone ? 'bg-gradient-to-tr from-emerald-950 to-slate-800 border-emerald-500/40' : 'bg-gradient-to-tr from-indigo-900/90 to-slate-800 border-slate-700'} border flex flex-col items-center justify-center shadow-inner relative z-10 transition-all duration-300`}>
-            {/* Animated Document Icon / Checkmark with Smooth Transition */}
+          <div className={`w-20 h-20 rounded-full ${isDone ? 'bg-gradient-to-tr from-emerald-950 to-slate-800 border-emerald-500/40' : 'bg-gradient-to-tr from-indigo-900/90 to-slate-800 border-slate-700'} border flex flex-col items-center justify-center shadow-inner relative z-10 transition-all duration-200`}>
             {isDone ? (
-              <div className="animate-in zoom-in-50 duration-300">
-                <CheckCircle className="w-11 h-11 text-emerald-400 drop-shadow-lg" />
+              <div className="animate-in zoom-in-50 duration-200">
+                <CheckCircle className="w-10 h-10 text-emerald-400 drop-shadow-lg" />
               </div>
             ) : (
-              <div className="animate-bounce">
-                <FileText className="w-9 h-9 text-blue-400 drop-shadow-md" />
-              </div>
+              <FileText className="w-8 h-8 text-blue-400 drop-shadow-md animate-pulse" />
             )}
-            
-            {/* Pulsing Status Particle */}
-            <div className="absolute -top-1 right-2">
-              <span className="flex h-2.5 w-2.5 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
-            </div>
           </div>
         </div>
 
-        {/* Title & Step Text */}
+        {/* Title & Status Text */}
         <div className="space-y-1.5">
           <h3 className="text-lg font-black tracking-tight text-slate-100">
             {isDone
               ? '🎉 Upload Complete!'
               : stage === 'processing' 
-                ? '⚡ Ingesting & Validating Documents...' 
+                ? '⚡ Finalizing & Ingesting Documents...' 
                 : `🚀 Uploading ${totalFiles} Document(s)...`}
           </h3>
-          <p className={`text-xs ${isDone ? 'text-emerald-400' : 'text-blue-400'} font-semibold transition-all duration-300`}>
-            {isDone ? 'Redirecting to Central Repository...' : currentStep.label}
-          </p>
-          <p className="text-[11px] text-slate-400">
-            {isDone ? 'Your document(s) are ready in the repository' : currentStep.detail}
+          <p className={`text-xs ${isDone ? 'text-emerald-400 font-bold' : 'text-blue-400 font-semibold'} transition-all duration-200`}>
+            {isDone 
+              ? 'Redirecting to Central Repository...' 
+              : stage === 'processing' 
+                ? 'Ingesting metadata & real-time verification' 
+                : `${loadedMB} MB of ${totalMB} MB transferred`}
           </p>
         </div>
 
@@ -131,24 +92,19 @@ function UploadingAnimationModal({ loading, progress, stage, stats, totalFiles, 
 
           <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/60">
             <div 
-              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 rounded-full transition-all duration-300 ease-out shadow-lg"
-              style={{ width: `${Math.max(progress, 6)}%` }}
+              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 rounded-full transition-all duration-150 ease-out shadow-lg"
+              style={{ width: `${Math.max(progress, 5)}%` }}
             />
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
             <span className="flex items-center space-x-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Security Verified • SHA-256</span>
+              <span>Real-Time SHA-256 Verified</span>
             </span>
             <span>Format: <strong className="text-slate-200">{documentType || 'Auto'}</strong></span>
           </div>
         </div>
-
-        {/* Safe hint */}
-        <p className="text-[10px] text-slate-400">
-          {isDone ? '✨ Finalizing upload verification...' : 'Please keep this tab open until the upload pipeline finishes.'}
-        </p>
 
       </div>
     </div>
@@ -430,12 +386,13 @@ export default function UploadDocument() {
       return;
     }
 
+    const totalBytes = filesList.reduce((acc, f) => acc + f.size, 0);
+
     const formData = new FormData();
     formData.append('folder_id', folderId);
     formData.append('document_type', documentType);
     formData.append('category', 'General');
 
-    // Build metadata array
     const metadata = filesList.map((item, index) => {
       formData.append('files', item.file);
       return {
@@ -449,7 +406,6 @@ export default function UploadDocument() {
 
     formData.append('files_metadata', JSON.stringify(metadata));
 
-    // Fallback single-file field for compatibility
     if (filesList.length === 1) {
       formData.append('title', filesList[0].title.trim());
       formData.append('document_type', documentType);
@@ -459,72 +415,71 @@ export default function UploadDocument() {
       setLoading(true);
       setUploadProgress(0);
       setUploadStage('uploading');
-      setUploadStats({
-        loaded: 0,
-        total: filesList.reduce((acc, f) => acc + f.size, 0)
-      });
+      setUploadStats({ loaded: 0, total: totalBytes });
 
       const res = await api.post('/documents', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            const percent = Math.min(Math.round((progressEvent.loaded * 100) / progressEvent.total), 95);
+            const percent = Math.min(Math.round((progressEvent.loaded * 100) / progressEvent.total), 99);
             setUploadProgress(percent);
             setUploadStats({
               loaded: progressEvent.loaded,
               total: progressEvent.total
             });
-            if (percent >= 95) {
+            if (percent >= 98) {
               setUploadStage('processing');
             }
           }
         }
       });
 
+      if (!res.data?.success) {
+        throw new Error(res.data?.message || 'Failed to upload document(s).');
+      }
+
       setUploadProgress(100);
       setUploadStage('done');
+      setUploadStats({ loaded: totalBytes, total: totalBytes });
 
-      if (res.data.success) {
-        // Collect uploaded document IDs to store in localStorage for the 1-minute recent highlight
-        const uploadedIds = [];
-        if (Array.isArray(res.data.documents)) {
-          res.data.documents.forEach(d => {
-            if (d && d.id) uploadedIds.push(d.id);
-          });
-        }
-        if (res.data.documentId && !uploadedIds.includes(res.data.documentId)) {
-          uploadedIds.push(res.data.documentId);
-        }
-
-        if (uploadedIds.length > 0) {
-          try {
-            localStorage.setItem('dms_recent_uploads', JSON.stringify({
-              ids: uploadedIds,
-              timestamp: Date.now()
-            }));
-          } catch (e) {
-            console.error('Failed to save recent uploads cache:', e);
-          }
-        }
-
-        setSuccessMsg(res.data.message || `Successfully uploaded ${filesList.length} document(s)!`);
-        
-        // 2-second smooth completion display before redirect
-        setTimeout(() => {
-          setLoading(false);
-          if (res.data.documentId && filesList.length === 1) {
-            navigate(`/documents/${res.data.documentId}`);
-          } else {
-            navigate('/documents');
-          }
-        }, 1900);
-      } else {
-        setLoading(false);
+      // Collect uploaded document IDs for the recent highlight badge
+      const uploadedIds = [];
+      if (Array.isArray(res.data.documents)) {
+        res.data.documents.forEach(d => {
+          if (d?.id && !uploadedIds.includes(d.id)) uploadedIds.push(d.id);
+        });
       }
+      if (res.data.documentId && !uploadedIds.includes(res.data.documentId)) {
+        uploadedIds.push(res.data.documentId);
+      }
+
+      if (uploadedIds.length > 0) {
+        try {
+          localStorage.setItem('dms_recent_uploads', JSON.stringify({
+            ids: uploadedIds,
+            timestamp: Date.now()
+          }));
+        } catch (e) {
+          console.error('Failed to save recent uploads cache:', e);
+        }
+      }
+
+      setSuccessMsg(res.data.message || `Successfully uploaded ${filesList.length} document(s)!`);
+      
+      // Snappy completion transition before instant redirect
+      setTimeout(() => {
+        setLoading(false);
+        if (uploadedIds.length === 1 && filesList.length === 1) {
+          navigate(`/documents/${uploadedIds[0]}`);
+        } else {
+          navigate('/documents');
+        }
+      }, 300);
+
     } catch (err) {
       setLoading(false);
       setUploadStage('');
-      setError(err.response?.data?.message || 'Failed to upload document(s).');
+      setError(err.response?.data?.message || err.message || 'Failed to upload document(s).');
     }
   };
 

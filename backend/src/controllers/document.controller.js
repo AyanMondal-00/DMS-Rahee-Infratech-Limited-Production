@@ -5,8 +5,8 @@ const XLSX = require('xlsx');
 const JSZip = require('jszip');
 const db = require('../config/db');
 const { calculateFileHash, uploadDir } = require('../config/storage');
-const { sendNotification } = require('../services/notification.service');
-const { logAudit } = require('../services/audit.service');
+const { sendNotification, sendBatchNotifications, EXCLUDED_NOTIF_EMAILS } = require('../services/notification.service');
+const { logAudit, logBatchAudits } = require('../services/audit.service');
 const { runArchivalPolicy } = require('../services/archival.service');
 const { 
   WORKFLOW_REVIEW_ENABLED,
@@ -148,22 +148,30 @@ async function uploadDocument(req, res) {
       }
     }
 
-    // Helper to check folder branch ancestor
+    // Folder branch validation cache for high-speed batch resolution
+    const folderBranchCache = new Map();
     async function isFolderUnderBranch(fId, branchName) {
       if (!fId) return false;
+      const cacheKey = `${fId}_${branchName.toUpperCase()}`;
+      if (folderBranchCache.has(cacheKey)) {
+        return folderBranchCache.get(cacheKey);
+      }
       let currentId = fId;
       const visited = new Set();
+      let result = false;
       while (currentId && !visited.has(currentId)) {
         visited.add(currentId);
         const rows = await db.query('SELECT id, name, parent_id FROM folders WHERE id = ?', [currentId]);
         if (!rows || rows.length === 0) break;
         const folder = rows[0];
-        if (folder.name.toUpperCase() === branchName.toUpperCase()) {
-          return true;
+        if (folder.name && folder.name.toUpperCase() === branchName.toUpperCase()) {
+          result = true;
+          break;
         }
         currentId = folder.parent_id;
       }
-      return false;
+      folderBranchCache.set(cacheKey, result);
+      return result;
     }
 
     let defaultFolderId = req.body.folder_id ? parseInt(req.body.folder_id) : null;
@@ -189,9 +197,13 @@ async function uploadDocument(req, res) {
 
     const initialStatus = WORKFLOW_REVIEW_ENABLED ? 'PENDING_REVIEW_1' : 'FINAL_APPROVED';
     const verTag = STATIC_VERSION_V1_ONLY ? 'General Version V1' : 'V1';
-    const createdDocuments = [];
 
-    // Pre-fetch target notification users
+    // 1. Instant SHA-256 Hash Resolution (Pre-computed on-the-fly during network stream by StreamHashingDiskStorage)
+    const fileHashes = await Promise.all(
+      uploadedFiles.map(file => file.fileHash || calculateFileHash(file.path))
+    );
+
+    // 2. Pre-fetch target notification users once
     const targetUsers = await db.query(
       `SELECT DISTINCT u.id, u.name, u.email, u.role_id, r.name as role_name
        FROM users u
@@ -201,21 +213,13 @@ async function uploadDocument(req, res) {
       [orgIdToUse]
     );
 
-    const EXCLUDED_NOTIF_EMAILS = [
-      'manish.p@rahee.com',
-      'ayush.k@rahee.com',
-      'manoj.g@rahee.com',
-      'arunabha.p@rahee.com'
-    ];
-
-    for (let i = 0; i < uploadedFiles.length; i++) {
-      const file = uploadedFiles[i];
+    // 3. Ingest documents and versions concurrently in parallel with safe pool allocation
+    const preparedDocTasks = uploadedFiles.map(async (file, i) => {
       const ext = path.extname(file.originalname).toUpperCase().replace('.', '');
       const actualDetectedType = docTypeMap[ext] || 'OTHER';
-
       const meta = filesMetadata.find(m => m.filename === file.originalname || m.index === i) || {};
 
-      // Determine clean Title
+      // Clean Title
       let fileTitle = '';
       if (meta.title && meta.title.trim()) {
         fileTitle = meta.title.trim();
@@ -241,10 +245,9 @@ async function uploadDocument(req, res) {
         if (!isUnder) fileFolderId = defaultFolderId;
       }
 
-      // SHA-256 Hash
-      const fileHash = await calculateFileHash(file.path);
+      const fileHash = fileHashes[i];
 
-      // 1. Insert Document
+      // Insert Document
       const docRes = await db.query(
         `INSERT INTO documents (organization_id, uploaded_by, title, description, category, document_type, status, current_version_number, is_locked, folder_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
@@ -253,7 +256,7 @@ async function uploadDocument(req, res) {
 
       const documentId = docRes.insertId;
 
-      // 2. Insert Version
+      // Insert Version
       const verRes = await db.query(
         `INSERT INTO document_versions (document_id, organization_id, version_number, version_index, original_filename, storage_key, file_size, mime_type, file_hash, uploaded_by, change_description, review_status)
          VALUES (?, ?, ?, 1.0, ?, ?, ?, ?, ?, ?, 'Initial document submission', ?)`,
@@ -265,7 +268,22 @@ async function uploadDocument(req, res) {
       // Update current_version_id
       await db.query('UPDATE documents SET current_version_id = ? WHERE id = ?', [versionId, documentId]);
 
-      // 3. Dispatch Notification
+      return {
+        id: documentId,
+        title: fileTitle,
+        original_filename: file.originalname,
+        document_type: fileDocType,
+        version: verTag,
+        status: initialStatus,
+        fileHash: fileHash
+      };
+    });
+
+    const createdDocuments = await Promise.all(preparedDocTasks);
+
+    // 4. Ultra-fast Bulk Notification Dispatching
+    const batchNotifications = [];
+    for (const doc of createdDocuments) {
       for (const targetUser of targetUsers) {
         if (targetUser.email && EXCLUDED_NOTIF_EMAILS.includes(targetUser.email.toLowerCase())) {
           continue;
@@ -274,49 +292,46 @@ async function uploadDocument(req, res) {
         const isUploader = targetUser.id === req.user.id;
         const notifTitle = isUploader 
           ? '📄 Document Uploaded Successfully' 
-          : `🔔 New Document Uploaded: ${fileTitle}`;
+          : `🔔 New Document Uploaded: ${doc.title}`;
         
         const notifMessage = isUploader
           ? WORKFLOW_REVIEW_ENABLED 
-            ? `Your document "${fileTitle}" (${verTag}) has been uploaded successfully and submitted for workflow review.`
-            : `Your document "${fileTitle}" (${verTag}) has been uploaded successfully and saved to the repository.`
-          : `A new document "${fileTitle}" (${verTag}) was uploaded by ${req.user.name} and is available in the repository.`;
+            ? `Your document "${doc.title}" (${verTag}) has been uploaded successfully and submitted for workflow review.`
+            : `Your document "${doc.title}" (${verTag}) has been uploaded successfully and saved to the repository.`
+          : `A new document "${doc.title}" (${verTag}) was uploaded by ${req.user.name} and is available in the repository.`;
 
-        await sendNotification({
+        batchNotifications.push({
           recipientId: targetUser.id,
+          recipientUser: targetUser,
           senderId: req.user.id,
-          documentId: documentId,
+          documentId: doc.id,
           organizationId: orgIdToUse,
           title: notifTitle,
           message: notifMessage,
           type: isUploader ? 'DOCUMENT_UPLOAD_SUCCESS' : 'NEW_DOCUMENT_UPLOADED',
           emailDetails: {
-            documentTitle: fileTitle,
+            documentTitle: doc.title,
             documentVersion: verTag
           }
         });
       }
-
-      // 4. Audit Log
-      await logAudit({
-        organization_id: orgIdToUse,
-        user_id: req.user.id,
-        action: 'DOCUMENT_UPLOADED',
-        document_id: documentId,
-        version: verTag,
-        comment: `Document '${fileTitle}' uploaded (SHA-256: ${fileHash.substring(0, 10)}...).`,
-        req
-      });
-
-      createdDocuments.push({
-        id: documentId,
-        title: fileTitle,
-        original_filename: file.originalname,
-        document_type: fileDocType,
-        version: verTag,
-        status: initialStatus
-      });
     }
+
+    // Fire batch notifications in single multi-row query + background email dispatch
+    sendBatchNotifications(batchNotifications).catch(e => {
+      console.error('Batch notification background warning:', e.message);
+    });
+
+    // 5. Ultra-fast Single SQL Batch Audit Logging (Non-blocking)
+    const auditEntries = createdDocuments.map(doc => ({
+      organization_id: orgIdToUse,
+      user_id: req.user.id,
+      action: 'DOCUMENT_UPLOADED',
+      document_id: doc.id,
+      version: verTag,
+      comment: `Document '${doc.title}' uploaded (SHA-256: ${(doc.fileHash || '').substring(0, 10)}...).`
+    }));
+    logBatchAudits(auditEntries, req).catch(e => console.error('Audit log non-blocking warning:', e.message));
 
     return res.status(201).json({
       success: true,
@@ -695,8 +710,9 @@ async function uploadNewVersion(req, res) {
         ? `Your revised version ${newVersionNumber} for document "${doc.title}" has been uploaded successfully.`
         : `Revised version ${newVersionNumber} of document "${doc.title}" was uploaded by ${req.user.name}.`;
 
-      await sendNotification({
+      sendNotification({
         recipientId: targetUser.id,
+        recipientUser: targetUser,
         senderId: req.user.id,
         documentId: id,
         organizationId: doc.organization_id,
@@ -707,7 +723,7 @@ async function uploadNewVersion(req, res) {
           documentTitle: doc.title,
           documentVersion: newVersionNumber
         }
-      });
+      }).catch(e => console.error('Revision notif error:', e.message));
     }
 
     await logAudit({
