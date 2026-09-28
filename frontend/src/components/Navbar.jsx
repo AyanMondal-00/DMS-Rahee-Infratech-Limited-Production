@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNotification } from '../context/NotificationContext';
+import { useNotification, isNotificationRestrictedUser } from '../context/NotificationContext';
 import { Bell, Mail, LogOut, ShieldAlert, Building2, User, Trash2, ChevronDown, CheckCheck, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const isNotificationRestricted = isNotificationRestrictedUser(user);
   const {
     notifications,
     unreadCount,
@@ -41,6 +42,7 @@ export default function Navbar() {
   }, [showNotifs]);
 
   const handleToggleNotifs = () => {
+    if (isNotificationRestricted) return;
     const nextState = !showNotifs;
     setShowNotifs(nextState);
     if (nextState) {
@@ -50,6 +52,7 @@ export default function Navbar() {
   };
 
   const handleViewAll = async () => {
+    if (isNotificationRestricted) return;
     try {
       setLoadingViewAll(true);
       // Fetch up to 50 notifications directly from DB API
@@ -74,59 +77,62 @@ export default function Navbar() {
             <Link to="/dashboard" className="font-bold text-base tracking-tight text-white hover:text-blue-300 transition">
               Enterprise Document Management
             </Link>
-            <p className="text-[10px] text-slate-400 font-mono tracking-wider uppercase">Multi-Tenant Secured Architecture</p>
+            
           </div>
         </div>
 
         {/* Right Nav Items */}
         <div className="flex items-center space-x-4">
 
-          {/* Email Outbox Shortcut */}
-          <Link
-            to="/emails"
-            className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition relative"
-            title="Email Activity Log & Outbox"
-          >
-            <Mail className="w-5 h-5" />
-            {emailLogs.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-extrabold px-1 min-w-[20px] h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow">
-                {emailLogs.length > 99 ? '99+' : emailLogs.length}
-              </span>
-            )}
-          </Link>
-
-          {/* In-App Notification Bell */}
-          <div className="relative" ref={notifRef}>
-            <button
-              onClick={handleToggleNotifs}
+          {/* Email Outbox Shortcut (Hidden for restricted users) */}
+          {!isNotificationRestricted && (
+            <Link
+              to="/emails"
               className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition relative"
-              title="Workflow Notifications"
+              title="Email Activity Log & Outbox"
             >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow">
-                  {unreadCount > 9 ? '9+' : unreadCount}
+              <Mail className="w-5 h-5" />
+              {emailLogs.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-extrabold px-1 min-w-[20px] h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow">
+                  {emailLogs.length > 99 ? '99+' : emailLogs.length}
                 </span>
               )}
-            </button>
+            </Link>
+          )}
 
-            {showNotifs && (
-              <div className="absolute right-0 mt-2 w-96 sm:w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-fadeIn">
-                {/* Header */}
-                <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-xs">Workflow Notifications</span>
-                    {totalCount > 0 ? (
-                      <span className="text-[10px] px-2 py-0.5 bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-full font-mono font-bold">
-                        {notifications.length} of {totalCount}
-                      </span>
-                    ) : notifications.length > 0 ? (
-                      <span className="text-[10px] px-2 py-0.5 bg-slate-700 text-slate-300 rounded-full font-mono">
-                        {notifications.length}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center space-x-2.5">
+          {/* In-App Notification Bell (Hidden for restricted users) */}
+          {!isNotificationRestricted && (
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={handleToggleNotifs}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition relative"
+                title="Workflow Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifs && (
+                <div className="absolute right-0 mt-2 w-96 sm:w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-fadeIn">
+                  {/* Header */}
+                  <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-xs">Workflow Notifications</span>
+                      {totalCount > 0 ? (
+                        <span className="text-[10px] px-2 py-0.5 bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-full font-mono font-bold">
+                          {notifications.length} of {totalCount}
+                        </span>
+                      ) : notifications.length > 0 ? (
+                        <span className="text-[10px] px-2 py-0.5 bg-slate-700 text-slate-300 rounded-full font-mono">
+                          {notifications.length}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center space-x-2.5">
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllAsRead}
@@ -251,6 +257,7 @@ export default function Navbar() {
               </div>
             )}
           </div>
+          )}
 
           {/* User & Organization Pill */}
           <div className="flex items-center space-x-3 border-l border-slate-800 pl-4">

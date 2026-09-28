@@ -6,6 +6,28 @@ import api, { SOCKET_URL } from '../services/api';
 
 const NotificationContext = createContext();
 
+export const isNotificationRestrictedUser = (u) => {
+  if (!u) return false;
+  const email = (u.email || '').toLowerCase().trim();
+  const name = (u.name || '').toLowerCase().trim();
+  const restrictedEmails = [
+    'manish.p@rahee.com',
+    'ayush.k@rahee.com',
+    'manoj.g@rahee.com',
+    'arunabha.p@rahee.com'
+  ];
+  if (restrictedEmails.some(e => email === e || email.startsWith(e.split('@')[0]))) return true;
+  if (
+    name.includes('manish') || 
+    name.includes('ayush') || 
+    name.includes('manoj') || 
+    name.includes('arunabha')
+  ) {
+    return true;
+  }
+  return false;
+};
+
 export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
@@ -22,9 +44,11 @@ export const NotificationProvider = ({ children }) => {
   const [alertState, setAlertState] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
 
+  const isRestricted = isNotificationRestrictedUser(user);
+
   // Fetch notifications from database API with specified limit and offset
   const fetchNotifications = async (options = {}) => {
-    if (!user) return;
+    if (!user || isRestricted) return;
     const limit = options.limit || currentLimit || 20;
     const offset = options.offset || 0;
     const append = options.append || false;
@@ -55,16 +79,21 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const refreshNotifications = async () => {
+    if (isRestricted) return;
     return fetchNotifications({ limit: currentLimit || 20, offset: 0 });
   };
 
   const loadViewAll = async (targetLimit = 50) => {
+    if (isRestricted) return;
     return fetchNotifications({ limit: targetLimit, offset: 0, append: false });
   };
 
   useEffect(() => {
-    if (!user) {
+    if (!user || isRestricted) {
       if (socket) socket.disconnect();
+      setNotifications([]);
+      setUnreadCount(0);
+      setTotalCount(0);
       return;
     }
 
@@ -80,6 +109,7 @@ export const NotificationProvider = ({ children }) => {
 
     // Listen for in-app real-time notifications
     newSocket.on('new_notification', (newNotif) => {
+      if (isRestricted) return;
       setNotifications(prev => {
         if (prev.some(n => n.id === newNotif.id)) return prev;
         return [newNotif, ...prev];

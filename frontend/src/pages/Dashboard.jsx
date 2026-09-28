@@ -130,6 +130,19 @@ export default function Dashboard() {
   const companyData = charts?.companyBreakdown || [];
   const storageItems = storageBreakdown.length > 0 ? storageBreakdown : (categoryData || []);
 
+  const userEmail = (user?.email || '').toLowerCase().trim();
+  const userName = (user?.name || '').toLowerCase().trim();
+
+  // Storage Card Visibility: Strictly restricted to Om Jha, Rahul Dey, and Rajib Ghosh ONLY
+  const isStorageCardViewer = Boolean(
+    // 1. Om Jha
+    userEmail.startsWith('om.jha@') || userName.includes('om jha') || user?.id === 10 ||
+    // 2. Rahul Dey
+    userEmail === 'rahul.d@rahee.com' || userEmail.startsWith('rahul.d@') || userName.includes('rahul dey') || user?.id === 5 ||
+    // 3. Rajib Ghosh (Super Admin)
+    userEmail === 'rajib.g@rahee.com' || userName.includes('rajib ghosh') || userName.includes('rajib') || user?.is_super_admin || user?.role_id === 1 || user?.id === 11
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -163,8 +176,8 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Metrics KPI Cards (5 Cards including Storage with Hover Breakdown) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      {/* Metrics KPI Cards */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isStorageCardViewer ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
         
         {/* 1. Total Documents */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow min-w-0">
@@ -178,7 +191,8 @@ export default function Dashboard() {
           <p className="text-[11px] text-slate-400 mt-1 truncate">Uploaded &amp; accessible files</p>
         </div>
 
-        {/* 2. Total Storage with Hover Pop-up Breakdown */}
+        {/* 2. Total Storage with Hover Pop-up Breakdown (Strictly visible only to Om Jha, Rahul Dey, Rajib Ghosh) */}
+        {isStorageCardViewer && (
         <div 
           className="relative group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 min-w-0 cursor-pointer select-none"
           onClick={() => setMobileStorageOpen(prev => !prev)}
@@ -300,10 +314,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        )}
 
-      
-
-        {/* 4. Total Folders */}
+        {/* 3. Total Folders */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider truncate">Total Folders</span>

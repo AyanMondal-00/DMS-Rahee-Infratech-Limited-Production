@@ -124,13 +124,7 @@ export default function DocumentPreviewModal({ isOpen, onClose, document, onDown
         </div>
 
         {/* Security Banner */}
-        <div className="bg-amber-50 px-6 py-2 border-b border-amber-200 flex items-center justify-between text-xs text-amber-800">
-          <div className="flex items-center space-x-2">
-            <Shield className="w-4 h-4 text-amber-600" />
-            <span><strong>Multi-Tenant Secure Preview Active:</strong> High-speed local blob stream loaded under organization isolation scope ({document.organization_code || 'AUTH'}).</span>
-          </div>
-          <span className="font-mono text-[11px] text-amber-700">SHA-256 Verified</span>
-        </div>
+    
 
         {/* Viewer Content Body */}
         <div className="flex-1 bg-slate-100 p-4 overflow-auto flex items-center justify-center relative">

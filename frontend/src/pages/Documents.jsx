@@ -36,7 +36,8 @@ import {
   ChevronRight,
   ChevronDown,
   HardDrive,
-  Calendar
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -89,6 +90,38 @@ export default function Documents() {
   const currentSelectedFolderObj = useMemo(() => {
     return folders.find(f => f.id === parseInt(selectedFolderId));
   }, [folders, selectedFolderId]);
+
+  const [recentUploadIds, setRecentUploadIds] = useState(new Set());
+
+  // 1-Minute OneDrive-style "Just Uploaded" highlight & marker lifecycle
+  useEffect(() => {
+    const updateRecentUploads = () => {
+      try {
+        const stored = localStorage.getItem('dms_recent_uploads');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const now = Date.now();
+          const ONE_MINUTE_MS = 60 * 1000;
+          if (parsed.timestamp && (now - parsed.timestamp) < ONE_MINUTE_MS) {
+            const idList = (parsed.ids || []).map(id => String(id));
+            setRecentUploadIds(new Set(idList));
+            return;
+          } else if (parsed.timestamp && (now - parsed.timestamp) >= ONE_MINUTE_MS) {
+            localStorage.removeItem('dms_recent_uploads');
+          }
+        }
+      } catch (e) {}
+      setRecentUploadIds(new Set());
+    };
+
+    updateRecentUploads();
+    const interval = setInterval(updateRecentUploads, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isRecentlyUploaded = (docId) => {
+    return recentUploadIds.has(String(docId));
+  };
 
   // Client-side strict tab filtering to guarantee active vs archive separation
   const displayedDocuments = useMemo(() => {
@@ -1262,20 +1295,42 @@ export default function Documents() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {displayedDocuments.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-slate-50/80 transition">
-                    
-                    {/* Document Title & Description */}
-                    <td className="py-3.5 px-4">
-                      <div>
-                        <Link to={`/documents/${doc.id}`} className="font-bold text-slate-900 hover:text-blue-600 text-sm line-clamp-1">
-                          {doc.title}
-                        </Link>
-                        {doc.description && (
-                          <p className="text-slate-400 text-[11px] line-clamp-1 mt-0.5">{doc.description}</p>
-                        )}
-                      </div>
-                    </td>
+                {displayedDocuments.map((doc) => {
+                  const isRecent = isRecentlyUploaded(doc.id);
+                  return (
+                    <tr 
+                      key={doc.id} 
+                      className={`transition-colors duration-500 ${
+                        isRecent 
+                          ? 'bg-blue-50/70 hover:bg-blue-50 border-l-4 border-l-blue-600' 
+                          : 'hover:bg-slate-50/80'
+                      }`}
+                    >
+                      
+                      {/* Document Title & Description */}
+                      <td className="py-3.5 px-4">
+                        <div>
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                            <Link to={`/documents/${doc.id}`} className="font-bold text-slate-900 hover:text-blue-600 text-sm line-clamp-1">
+                              {doc.title}
+                            </Link>
+                            
+                            {/* OneDrive-style Just Uploaded Marker (Active for 1 minute) */}
+                            {isRecent && (
+                              <span 
+                                className="inline-flex items-center space-x-1 px-2 py-0.5 bg-blue-600 text-white text-[10px] font-extrabold rounded-full shadow-xs animate-pulse"
+                                title="✨ Just uploaded within the last 1 minute"
+                              >
+                                <Sparkles className="w-3 h-3 text-amber-300" />
+                               
+                              </span>
+                            )}
+                          </div>
+                          {doc.description && (
+                            <p className="text-slate-400 text-[11px] line-clamp-1 mt-0.5">{doc.description}</p>
+                          )}
+                        </div>
+                      </td>
 
                     {/* Document Type Badge */}
                     <td className="py-3.5 px-4">
@@ -1515,7 +1570,8 @@ export default function Documents() {
                     </td>
 
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
@@ -1647,21 +1703,6 @@ export default function Documents() {
                   className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium text-slate-900"
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Folder Description
-                </label>
-                <input
-                  type="text"
-                  value={folderDesc}
-                  onChange={(e) => setFolderDesc(e.target.value)}
-                  placeholder="Optional description or context..."
-                  className="w-full p-3 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                />
-              </div>
-
-
 
               <div className="flex items-center justify-end space-x-3 pt-2">
                 <button
@@ -1931,19 +1972,6 @@ export default function Documents() {
                   required
                   autoFocus
                   placeholder="e.g. Design Specifications 2026"
-                  className="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5">
-                  Folder Description (Optional)
-                </label>
-                <textarea
-                  value={newFolderDesc}
-                  onChange={(e) => setNewFolderDesc(e.target.value)}
-                  rows={2}
-                  placeholder="Brief description of documents stored in this directory..."
                   className="w-full p-2.5 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                 />
               </div>
