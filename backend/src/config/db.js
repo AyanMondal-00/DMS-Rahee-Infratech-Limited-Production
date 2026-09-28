@@ -392,6 +392,14 @@ async function createTables() {
     console.warn('Delete permission migration warning:', e.message);
   }
 
+  // Migration: Ensure Role 6 (DOCUMENT_VIEWER) and Role 7 (DOCUMENT_UPLOADER) only have view, preview, download, view_audit_logs (and upload for role 7)
+  try {
+    await query("UPDATE roles SET name = 'DOCUMENT_VIEWER', description = 'Document Viewer (Preview & Download, Audit Logs)' WHERE id = 6");
+    await query("DELETE rp FROM role_permissions rp JOIN permissions p ON rp.permission_id = p.id WHERE rp.role_id IN (6, 7) AND p.code IN ('edit', 'view_reports', 'manage_folders')");
+  } catch (e) {
+    console.warn('Role permissions cleanup migration warning:', e.message);
+  }
+
   // Migration: Add soft delete and recycle bin tracking columns
   try { await query('ALTER TABLE folders ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch (e) {}
   try { await query('ALTER TABLE folders ADD COLUMN deleted_at DATETIME DEFAULT NULL'); } catch (e) {}
@@ -402,6 +410,9 @@ async function createTables() {
   try { await query('ALTER TABLE documents ADD COLUMN deleted_at DATETIME DEFAULT NULL'); } catch (e) {}
   try { await query('ALTER TABLE documents ADD COLUMN deleted_by INTEGER DEFAULT NULL'); } catch (e) {}
   try { await query('ALTER TABLE documents ADD COLUMN original_folder_id INTEGER DEFAULT NULL'); } catch (e) {}
+
+  try { await query('ALTER TABLE email_logs ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch (e) {}
+  try { await query('ALTER TABLE email_logs ADD COLUMN deleted_at DATETIME DEFAULT NULL'); } catch (e) {}
 
   // Performance Indexes
   try { await query('CREATE INDEX idx_docs_org_status ON documents(organization_id, status, is_deleted)'); } catch (e) {}
@@ -430,7 +441,7 @@ async function seedInitialData() {
     { id: 3, name: 'RAHEE_EXEC_ADMIN', description: 'Company 1 Executive Admin & User Manager' },
     { id: 4, name: 'STEP2_REVIEWER', description: 'Step 2 Workflow Reviewer' },
     { id: 5, name: 'FINAL_APPROVER', description: 'Step 3 Final Document Approver' },
-    { id: 6, name: 'MANAGER_OVERSIGHT', description: 'Departmental Manager Oversight & Reports' },
+    { id: 6, name: 'DOCUMENT_VIEWER', description: 'Document Viewer & Preview Rights' },
     { id: 7, name: 'DOCUMENT_UPLOADER', description: 'Document Uploader & Revision Submitter' },
     { id: 8, name: 'IRCON_ADMIN_REVIEWER', description: 'Company 2 Admin & Step 1 Reviewer' }
   ];
@@ -474,10 +485,10 @@ async function seedInitialData() {
   await addRolePermissions(4, [2, 3, 4, 5, 6, 9, 10]);
   // 5: FINAL_APPROVER (Manoj Ghosh: view, preview, download, final_approve)
   await addRolePermissions(5, [2, 3, 5, 7]);
-  // 6: MANAGER_OVERSIGHT (Mukesh Prasad, Pintu Bhukta, Somenath Mondal, Ayush Khaitan, Arunabha Pyne: view, preview, edit, download, view_audit_logs, view_reports)
-  await addRolePermissions(6, [2, 3, 4, 5, 9, 10]);
-  // 7: DOCUMENT_UPLOADER (Somnath Mondal: upload, view, preview, edit, download, view_audit_logs, view_reports)
-  await addRolePermissions(7, [1, 2, 3, 4, 5, 9, 10]);
+  // 6: MANAGER_OVERSIGHT (Mukesh Prasad, Pintu Bhukta, Somenath Mondal, Ayush Khaitan, Arunabha Pyne: view, preview, download, view_audit_logs)
+  await addRolePermissions(6, [2, 3, 5, 9]);
+  // 7: DOCUMENT_UPLOADER (Somnath Mondal: upload, view, preview, download, view_audit_logs)
+  await addRolePermissions(7, [1, 2, 3, 5, 9]);
   // 8: IRCON_ADMIN (Om Jha / Company Admin: upload, view, preview, download, approve_reject, view_audit_logs, view_reports, manage_folders)
   await addRolePermissions(8, [1, 2, 3, 4, 5, 6, 9, 10, 11]);
 

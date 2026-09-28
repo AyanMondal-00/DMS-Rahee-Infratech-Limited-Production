@@ -55,22 +55,28 @@ async function sendWorkflowEmail({ toEmail, toName, subject, eventType, document
     }
 
     // Always log to email_logs table for audit & UI Outbox view
-    await db.query(
+    const insertRes = await db.query(
       `INSERT INTO email_logs (recipient_email, recipient_name, subject, body_html, event_type, document_title, status) 
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [toEmail, toName || toEmail, subject, bodyHtml, eventType, documentTitle || 'N/A', sentStatus]
     );
 
+    const logId = insertRes.insertId;
+
     // Emit live Socket.IO update for Email Activity Monitor in UI
     if (socketIo) {
       socketIo.emit('email_activity', {
-        toEmail,
-        toName,
-        subject,
-        eventType,
-        documentTitle,
-        sentStatus,
-        timestamp: new Date().toISOString()
+        id: logId,
+        recipient_email: toEmail,
+        recipient_name: toName || toEmail,
+        subject: subject,
+        event_type: eventType,
+        document_title: documentTitle || 'N/A',
+        status: sentStatus,
+        body_html: bodyHtml,
+        is_deleted: 0,
+        deleted_at: null,
+        created_at: new Date().toISOString()
       });
     }
 

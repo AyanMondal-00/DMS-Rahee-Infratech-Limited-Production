@@ -48,14 +48,14 @@ async function markAllAsRead(req, res) {
   }
 }
 
-// Fetch Email Logs (Outbox Activity)
+// Fetch Email Logs (Outbox Activity - Active)
 async function getEmailLogs(req, res) {
   try {
-    let sql = 'SELECT * FROM email_logs';
+    let sql = 'SELECT * FROM email_logs WHERE (is_deleted = 0 OR is_deleted IS NULL)';
     let params = [];
 
     if (!req.user.is_super_admin) {
-      sql += ' WHERE recipient_email = ?';
+      sql += ' AND recipient_email = ?';
       params.push(req.user.email);
     }
 
@@ -68,9 +68,170 @@ async function getEmailLogs(req, res) {
   }
 }
 
+// Fetch Deleted Email Logs (Trash)
+async function getDeletedEmailLogs(req, res) {
+  try {
+    let sql = 'SELECT * FROM email_logs WHERE is_deleted = 1';
+    let params = [];
+
+    if (!req.user.is_super_admin) {
+      sql += ' AND recipient_email = ?';
+      params.push(req.user.email);
+    }
+
+    sql += ' ORDER BY deleted_at DESC, id DESC LIMIT 100';
+
+    const emailLogs = await db.query(sql, params);
+    return res.json({ success: true, emailLogs });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Delete a specific notification by ID
+async function deleteNotification(req, res) {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM notifications WHERE id = ? AND recipient_id = ?', [id, req.user.id]);
+    return res.json({ success: true, message: 'Notification deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Clear / Delete all notifications for the authenticated user
+async function clearAllNotifications(req, res) {
+  try {
+    await db.query('DELETE FROM notifications WHERE recipient_id = ?', [req.user.id]);
+    return res.json({ success: true, message: 'All notifications cleared successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Delete a specific email log by ID (Soft delete -> Trash)
+async function deleteEmailLog(req, res) {
+  try {
+    const { id } = req.params;
+    let sql = 'UPDATE email_logs SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE id = ?';
+    let params = [id];
+
+    if (!req.user.is_super_admin) {
+      sql += ' AND recipient_email = ?';
+      params.push(req.user.email);
+    }
+
+    await db.query(sql, params);
+    return res.json({ success: true, message: 'Email log moved to trash successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Clear / Move all active email logs to trash
+async function clearAllEmailLogs(req, res) {
+  try {
+    let sql = 'UPDATE email_logs SET is_deleted = 1, deleted_at = CURRENT_TIMESTAMP WHERE (is_deleted = 0 OR is_deleted IS NULL)';
+    let params = [];
+
+    if (!req.user.is_super_admin) {
+      sql += ' AND recipient_email = ?';
+      params.push(req.user.email);
+    }
+
+    await db.query(sql, params);
+    return res.json({ success: true, message: 'All email logs moved to trash successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Restore a specific deleted email log
+async function restoreEmailLog(req, res) {
+  try {
+    const { id } = req.params;
+    let sql = 'UPDATE email_logs SET is_deleted = 0, deleted_at = NULL WHERE id = ? AND is_deleted = 1';
+    let params = [id];
+
+    if (!req.user.is_super_admin) {
+      sql += ' AND recipient_email = ?';
+      params.push(req.user.email);
+    }
+
+    await db.query(sql, params);
+    return res.json({ success: true, message: 'Email log restored successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Restore all deleted email logs
+async function restoreAllEmailLogs(req, res) {
+  try {
+    let sql = 'UPDATE email_logs SET is_deleted = 0, deleted_at = NULL WHERE is_deleted = 1';
+    let params = [];
+
+    if (!req.user.is_super_admin) {
+      sql += ' AND recipient_email = ?';
+      params.push(req.user.email);
+    }
+
+    await db.query(sql, params);
+    return res.json({ success: true, message: 'All deleted email logs restored successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Permanently purge a deleted email log
+async function permanentDeleteEmailLog(req, res) {
+  try {
+    const { id } = req.params;
+    let sql = 'DELETE FROM email_logs WHERE id = ?';
+    let params = [id];
+
+    if (!req.user.is_super_admin) {
+      sql += ' AND recipient_email = ?';
+      params.push(req.user.email);
+    }
+
+    await db.query(sql, params);
+    return res.json({ success: true, message: 'Email log permanently deleted.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+// Empty entire email trash
+async function emptyEmailTrash(req, res) {
+  try {
+    let sql = 'DELETE FROM email_logs WHERE is_deleted = 1';
+    let params = [];
+
+    if (!req.user.is_super_admin) {
+      sql += ' AND recipient_email = ?';
+      params.push(req.user.email);
+    }
+
+    await db.query(sql, params);
+    return res.json({ success: true, message: 'Email trash emptied successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 module.exports = {
   getNotifications,
   markAsRead,
   markAllAsRead,
-  getEmailLogs
+  deleteNotification,
+  clearAllNotifications,
+  getEmailLogs,
+  getDeletedEmailLogs,
+  deleteEmailLog,
+  clearAllEmailLogs,
+  restoreEmailLog,
+  restoreAllEmailLogs,
+  permanentDeleteEmailLog,
+  emptyEmailTrash
 };
