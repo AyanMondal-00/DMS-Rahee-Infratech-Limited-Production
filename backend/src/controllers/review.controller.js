@@ -284,7 +284,7 @@ async function processReviewAction(req, res) {
            FROM users u
            LEFT JOIN roles r ON u.role_id = r.id
            WHERE (u.organization_id = ? OR u.organization_id IS NULL OR r.name = 'SUPER_ADMIN')
-             AND (r.name IS NULL OR r.name != 'MANAGER_OVERSIGHT')
+             AND (r.name IS NULL OR (r.name != 'MANAGER_OVERSIGHT' AND r.name != 'DOCUMENT_VIEWER'))
              AND u.status = 'ACTIVE'`,
           [doc.organization_id]
         );
@@ -328,7 +328,7 @@ async function processReviewAction(req, res) {
            FROM users u
            LEFT JOIN roles r ON u.role_id = r.id
            WHERE (u.organization_id = ? OR u.organization_id IS NULL OR r.name = 'SUPER_ADMIN')
-             AND (r.name IS NULL OR r.name != 'MANAGER_OVERSIGHT')
+             AND (r.name IS NULL OR (r.name != 'MANAGER_OVERSIGHT' AND r.name != 'DOCUMENT_VIEWER'))
              AND u.status = 'ACTIVE'`,
           [doc.organization_id]
         );

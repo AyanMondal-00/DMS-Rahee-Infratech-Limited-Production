@@ -238,7 +238,7 @@ export default function Users() {
     const org = selectedOrgId || orgId;
     if (func === 'Admin') {
       setRoleId((parseInt(org) === 2 || org === '2') ? '8' : '2');
-    } else if (func === 'Execution Control' && cap === 'Upload') {
+    } else if (cap === 'Upload') {
       setRoleId('7');
     } else {
       setRoleId('6');
@@ -305,7 +305,7 @@ export default function Users() {
                   <th className="py-4 px-5">User Name & ID</th>
                   <th className="py-4 px-5">Organization</th>
                   <th className="py-4 px-5">Function / Designation</th>
-                  <th className="py-4 px-5">Document Capability</th>
+                  <th className="py-4 px-5">Document Permissions</th>
                   <th className="py-4 px-5">Password</th>
                   <th className="py-4 px-5 text-right">Actions</th>
                 </tr>
@@ -445,7 +445,10 @@ export default function Users() {
             </div>
 
             {/* Modal Body Form */}
-            <form onSubmit={handleCreateUser} className="p-6 space-y-5 text-xs overflow-y-auto">
+            <form onSubmit={handleCreateUser} className="p-6 space-y-5 text-xs overflow-y-auto" autoComplete="off">
+              {/* Browser Autofill Blocker: Hidden inputs prevent Chrome/Edge from autofilling current logged-in credentials */}
+              <input type="text" name="dms_prevent_autofill_user" style={{ display: 'none' }} tabIndex="-1" autoComplete="off" />
+              <input type="password" name="dms_prevent_autofill_pass" style={{ display: 'none' }} tabIndex="-1" autoComplete="new-password" />
               
               {modalError && (
                 <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 font-semibold rounded-2xl flex items-center space-x-2.5 text-xs animate-shake">
@@ -467,6 +470,9 @@ export default function Users() {
                     <div className="relative">
                       <input
                         type="text"
+                        name="dms_create_fullname"
+                        id="dms_create_fullname"
+                        autoComplete="off"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         required
@@ -482,10 +488,13 @@ export default function Users() {
                     <div className="relative">
                       <input
                         type="email"
+                        name="dms_create_email"
+                        id="dms_create_email"
+                        autoComplete="new-password"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        placeholder="rahul@raheeinfratech.com"
+                        placeholder="e.g. user@organization.com"
                         className="w-full p-2.5 pl-8 border border-slate-300 rounded-xl bg-white font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                       <Mail className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -498,6 +507,9 @@ export default function Users() {
                   <div className="relative">
                     <input
                       type={showCreatePassword ? 'text' : 'password'}
+                      name="dms_create_password"
+                      id="dms_create_password"
+                      autoComplete="new-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -528,7 +540,7 @@ export default function Users() {
                     onChange={(e) => {
                       const newOrg = e.target.value;
                       setOrgId(newOrg);
-                      if (userFunction) {
+                      if (userFunction || documentCapability) {
                         updateRoleMapping(userFunction, documentCapability, newOrg);
                       }
                     }}
@@ -551,7 +563,7 @@ export default function Users() {
               <div className="space-y-3.5 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/70">
                 <div className="flex items-center space-x-2 text-slate-800 font-bold text-[11px] uppercase tracking-wider pb-1 border-b border-slate-200">
                   <Shield className="w-3.5 h-3.5 text-blue-600" />
-                  <span>3. Functional Role & Document Capability</span>
+                  <span>3. Functional Role & Document Permissions</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -584,7 +596,7 @@ export default function Users() {
 
                   {/* Dropdown 2: Document Upload and Viewer Rights */}
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Document Capability (*)</label>
+                    <label className="block font-bold text-slate-700 mb-1">Document Permissions (*)</label>
                     <select
                       value={documentCapability}
                       onChange={(e) => {
@@ -706,10 +718,14 @@ export default function Users() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleResetPasswordSubmit} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleResetPasswordSubmit} className="p-6 space-y-4 text-xs" autoComplete="off">
+              {/* Browser Autofill Blocker */}
+              <input type="text" name="dms_prevent_reset_user" style={{ display: 'none' }} tabIndex="-1" autoComplete="off" />
+              <input type="password" name="dms_prevent_reset_pass" style={{ display: 'none' }} tabIndex="-1" autoComplete="new-password" />
+
               {resetError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 font-semibold rounded-xl flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                   <span>{resetError}</span>
                 </div>
               )}
@@ -729,6 +745,9 @@ export default function Users() {
                 <div className="relative">
                   <input
                     type={showNewPassword ? 'text' : 'password'}
+                    name="dms_new_reset_password"
+                    id="dms_new_reset_password"
+                    autoComplete="new-password"
                     value={newResetPassword}
                     onChange={(e) => setNewResetPassword(e.target.value)}
                     required
@@ -753,6 +772,9 @@ export default function Users() {
                 <div className="relative">
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
+                    name="dms_confirm_reset_password"
+                    id="dms_confirm_reset_password"
+                    autoComplete="new-password"
                     value={confirmResetPassword}
                     onChange={(e) => setConfirmResetPassword(e.target.value)}
                     required

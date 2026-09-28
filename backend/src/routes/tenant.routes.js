@@ -28,5 +28,6 @@ router.use(authenticateToken);
 router.get('/', tenantController.getOrganizations);
 router.post('/', requireAdminOrManageUsers, tenantController.createOrganization);
 router.patch('/:id/status', requireAdminOrManageUsers, tenantController.updateOrganizationStatus);
+router.delete('/:id', requireAdminOrManageUsers, tenantController.deleteOrganization);
 
 module.exports = router;

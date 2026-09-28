@@ -3,16 +3,22 @@ const { logAudit } = require('../services/audit.service');
 
 async function getOrganizations(req, res) {
   try {
-    let sql = 'SELECT * FROM organizations';
+    let sql = `
+      SELECT o.*,
+             (SELECT COUNT(u.id) FROM users u WHERE u.organization_id = o.id) as total_users,
+             (SELECT COUNT(d.id) FROM documents d WHERE d.organization_id = o.id AND (d.is_deleted = 0 OR d.is_deleted IS NULL)) as total_documents,
+             (SELECT COUNT(f.id) FROM folders f WHERE f.organization_id = o.id AND (f.is_deleted = 0 OR f.is_deleted IS NULL)) as total_folders
+      FROM organizations o
+    `;
     let params = [];
 
     // If non-super admin, limit list to their organization
     if (!req.user.is_super_admin) {
-      sql += ' WHERE id = ?';
+      sql += ' WHERE o.id = ?';
       params.push(req.user.organization_id);
     }
 
-    sql += ' ORDER BY id ASC';
+    sql += ' ORDER BY o.id ASC';
     const orgs = await db.query(sql, params);
     return res.json({ success: true, organizations: orgs });
   } catch (err) {
@@ -126,8 +132,62 @@ async function updateOrganizationStatus(req, res) {
   }
 }
 
+async function deleteOrganization(req, res) {
+  try {
+    const { id } = req.params;
+    const orgId = parseInt(id);
+
+    if (!req.user.is_super_admin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden: Organization deletion is strictly reserved for the Global Super Administrator.'
+      });
+    }
+
+    const orgs = await db.query('SELECT * FROM organizations WHERE id = ?', [orgId]);
+    if (!orgs || orgs.length === 0) {
+      return res.status(404).json({ success: false, message: 'Organization not found.' });
+    }
+    const targetOrg = orgs[0];
+
+    // Count dependent users and documents
+    const [userCount] = await db.query('SELECT COUNT(id) as cnt FROM users WHERE organization_id = ?', [orgId]);
+    const [docCount] = await db.query('SELECT COUNT(id) as cnt FROM documents WHERE organization_id = ?', [orgId]);
+    const numUsers = userCount ? (userCount.cnt || 0) : 0;
+    const numDocs = docCount ? (docCount.cnt || 0) : 0;
+
+    // Safely disable user accounts associated with this organization
+    await db.query('UPDATE users SET status = "DISABLED" WHERE organization_id = ?', [orgId]);
+
+    // Soft delete documents/folders under this org
+    await db.query('UPDATE documents SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE organization_id = ?', [req.user.id, orgId]);
+    await db.query('UPDATE folders SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE organization_id = ?', [req.user.id, orgId]);
+
+    // Delete the organization record
+    await db.query('DELETE FROM organizations WHERE id = ?', [orgId]);
+
+    await logAudit({
+      organization_id: orgId,
+      user_id: req.user.id,
+      user_email: req.user.email,
+      user_name: req.user.name,
+      action: 'ORGANIZATION_DELETED',
+      comment: `Tenant Organization '${targetOrg.name}' (${targetOrg.code}) was deleted by Super Admin ${req.user.name}. (Archived ${numUsers} users, ${numDocs} documents).`,
+      req
+    });
+
+    return res.json({
+      success: true,
+      message: `Organization "${targetOrg.name}" (${targetOrg.code}) deleted successfully.`
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 module.exports = {
   getOrganizations,
   createOrganization,
-  updateOrganizationStatus
+  updateOrganizationStatus,
+  deleteOrganization
 };

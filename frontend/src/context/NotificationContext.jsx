@@ -70,7 +70,15 @@ export const NotificationProvider = ({ children }) => {
 
     // Listen for live email activity updates
     newSocket.on('email_activity', (emailEvent) => {
-      setEmailLogs(prev => [emailEvent, ...prev]);
+      if (emailEvent && user) {
+        const isRelevant = user.is_super_admin || (emailEvent.recipient_email && user.email && emailEvent.recipient_email.toLowerCase() === user.email.toLowerCase());
+        if (isRelevant) {
+          setEmailLogs(prev => {
+            if (emailEvent.id && prev.some(e => e.id === emailEvent.id)) return prev;
+            return [emailEvent, ...prev];
+          });
+        }
+      }
     });
 
     return () => {
@@ -95,6 +103,87 @@ export const NotificationProvider = ({ children }) => {
       setUnreadCount(0);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    try {
+      const target = notifications.find(n => n.id === id);
+      await api.delete(`/notifications/${id}`);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+      if (target && (Number(target.is_read) === 0 || target.is_read === false)) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    try {
+      await api.delete('/notifications/clear-all');
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Failed to clear all notifications:', err);
+    }
+  };
+
+  const deleteEmailLog = async (id) => {
+    try {
+      await api.delete(`/notifications/emails/${id}`);
+      setEmailLogs(prev => prev.filter(e => e.id !== id));
+    } catch (err) {
+      console.error('Failed to delete email log:', err);
+    }
+  };
+
+  const clearAllEmailLogs = async () => {
+    try {
+      await api.delete('/notifications/emails/clear-all');
+      setEmailLogs([]);
+    } catch (err) {
+      console.error('Failed to clear all email logs:', err);
+    }
+  };
+
+  const restoreEmailLog = async (id) => {
+    try {
+      await api.patch(`/notifications/emails/${id}/restore`);
+      const emailRes = await api.get('/notifications/emails');
+      if (emailRes.data.success) {
+        setEmailLogs(emailRes.data.emailLogs);
+      }
+    } catch (err) {
+      console.error('Failed to restore email log:', err);
+    }
+  };
+
+  const restoreAllEmailLogs = async () => {
+    try {
+      await api.patch('/notifications/emails/restore-all');
+      const emailRes = await api.get('/notifications/emails');
+      if (emailRes.data.success) {
+        setEmailLogs(emailRes.data.emailLogs);
+      }
+    } catch (err) {
+      console.error('Failed to restore all email logs:', err);
+    }
+  };
+
+  const permanentDeleteEmailLog = async (id) => {
+    try {
+      await api.delete(`/notifications/emails/${id}/permanent`);
+    } catch (err) {
+      console.error('Failed to permanently delete email log:', err);
+    }
+  };
+
+  const emptyEmailTrash = async () => {
+    try {
+      await api.delete('/notifications/emails/empty-trash');
+    } catch (err) {
+      console.error('Failed to empty email trash:', err);
     }
   };
 
@@ -151,6 +240,14 @@ export const NotificationProvider = ({ children }) => {
       setToast,
       markAsRead,
       markAllAsRead,
+      deleteNotification,
+      clearAllNotifications,
+      deleteEmailLog,
+      clearAllEmailLogs,
+      restoreEmailLog,
+      restoreAllEmailLogs,
+      permanentDeleteEmailLog,
+      emptyEmailTrash,
       refreshNotifications,
       showAlert,
       showConfirm
