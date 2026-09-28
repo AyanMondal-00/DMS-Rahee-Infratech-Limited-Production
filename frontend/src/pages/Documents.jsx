@@ -792,7 +792,7 @@ export default function Documents() {
     }
     const confirmed = await showConfirm({
       title: 'Delete Document',
-      message: `Are you sure you want to move document "${doc.title}" to the Recycle Bin? Super Admin (Rajib Ghosh) can restore it to this exact directory at any time.`,
+      message: `Are you sure you want to move document "${doc.title}" to the Recycle Bin? Super Admin can restore it to this exact directory at any time.`,
       confirmText: 'Move to Recycle Bin',
       isDanger: true
     });
@@ -1360,18 +1360,6 @@ export default function Documents() {
 
                               {/* Horizontal Expandable Path Bar (Exact sync with Top Navigation Bar) */}
                               <div className="bg-slate-950/90 border border-slate-800 p-2 rounded-lg font-mono text-[11px] text-slate-300 flex items-center flex-wrap gap-1">
-                                {hasHiddenAncestors && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleExpandPath(e, doc.id)}
-                                    className="px-1.5 py-0.5 bg-blue-900/50 hover:bg-blue-800/80 text-blue-300 hover:text-blue-100 rounded border border-blue-500/40 font-bold flex items-center space-x-0.5 cursor-pointer transition text-[10px]"
-                                    title="Click to expand 1 level backwards towards Root"
-                                  >
-                                    <span>...</span>
-                                    <span className="font-black text-xs">+</span>
-                                  </button>
-                                )}
-
                                 {showRoot && (
                                   <button
                                     type="button"
@@ -1391,7 +1379,7 @@ export default function Documents() {
                                   const isImmediateFolder = idx === visibleFolders.length - 1;
                                   return (
                                     <React.Fragment key={f.id}>
-                                      {(showRoot || idx > 0 || hasHiddenAncestors) && (
+                                      {(showRoot || idx > 0) && (
                                         <ChevronRight className="w-3 h-3 text-slate-600 shrink-0" />
                                       )}
                                       <button
@@ -1412,7 +1400,7 @@ export default function Documents() {
                                   );
                                 })}
 
-                                {visibleFolders.length === 0 && !hasHiddenAncestors && (
+                                {visibleFolders.length === 0 && (
                                   <button
                                     type="button"
                                     onClick={(e) => {

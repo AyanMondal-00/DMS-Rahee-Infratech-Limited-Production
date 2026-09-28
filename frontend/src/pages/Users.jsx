@@ -220,6 +220,15 @@ export default function Users() {
     }
   };
 
+  // Default fallback permissions by role ID if API mapping is loading or not populated
+  const defaultRolePermissions = {
+    1: ['view', 'preview', 'download', 'manage_users', 'view_audit_logs', 'view_reports', 'manage_folders'],
+    2: ['upload', 'view', 'preview', 'edit', 'download', 'view_audit_logs', 'view_reports', 'manage_folders'],
+    6: ['view', 'preview', 'edit', 'download', 'view_audit_logs', 'view_reports'],
+    7: ['upload', 'view', 'preview', 'edit', 'download', 'view_audit_logs', 'view_reports'],
+    8: ['upload', 'view', 'preview', 'edit', 'download', 'view_audit_logs', 'view_reports', 'manage_folders']
+  };
+
   const resetCreateForm = () => {
     setName('');
     setEmail('');
@@ -233,12 +242,17 @@ export default function Users() {
     setShowCreateModal(true);
   };
 
-  // Helper to resolve role ID from function and document capability
+  // Helper to dynamically resolve system role ID from function, document capability & tenant organization
   const updateRoleMapping = (func, cap, selectedOrgId) => {
     const org = selectedOrgId || orgId;
+    if (!func && !cap) {
+      setRoleId('');
+      return;
+    }
+    
     if (func === 'Admin') {
       setRoleId((parseInt(org) === 2 || org === '2') ? '8' : '2');
-    } else if (func === 'Execution Control' && cap === 'Upload') {
+    } else if (cap === 'Upload') {
       setRoleId('7');
     } else {
       setRoleId('6');
@@ -305,8 +319,8 @@ export default function Users() {
                   <th className="py-4 px-5">User Name & ID</th>
                   <th className="py-4 px-5">Organization</th>
                   <th className="py-4 px-5">Function / Designation</th>
-                  <th className="py-4 px-5">Document Capability</th>
-                  <th className="py-4 px-5">Password</th>
+                  <th className="py-4 px-5">Document Access Capability</th>
+                  <th className="py-4 px-5">Password Reset</th>
                   <th className="py-4 px-5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -433,7 +447,7 @@ export default function Users() {
                 </div>
                 <div>
                   <h3 className="font-black text-base tracking-tight text-white">Create Enterprise User</h3>
-                  <p className="text-xs text-slate-300">Set identity credentials, organization tenant & access rights</p>
+                 
                 </div>
               </div>
               <button 
@@ -551,7 +565,7 @@ export default function Users() {
               <div className="space-y-3.5 bg-slate-50/70 p-4 rounded-2xl border border-slate-200/70">
                 <div className="flex items-center space-x-2 text-slate-800 font-bold text-[11px] uppercase tracking-wider pb-1 border-b border-slate-200">
                   <Shield className="w-3.5 h-3.5 text-blue-600" />
-                  <span>3. Functional Role & Document Capability</span>
+                  <span>3. Functional Role & Document Access Capability</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -566,8 +580,11 @@ export default function Users() {
                         let cap = documentCapability;
                         if (func === 'Admin' || func === 'Execution Control') {
                           cap = 'Upload';
+                          setDocumentCapability('Upload');
+                        } else if (func === 'Viewer') {
+                          cap = 'Viewer';
+                          setDocumentCapability('Viewer');
                         }
-                        setDocumentCapability(cap);
                         updateRoleMapping(func, cap, orgId);
                       }}
                       required
@@ -584,7 +601,7 @@ export default function Users() {
 
                   {/* Dropdown 2: Document Upload and Viewer Rights */}
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Document Capability (*)</label>
+                    <label className="block font-bold text-slate-700 mb-1">Document Access Capability (*)</label>
                     <select
                       value={documentCapability}
                       onChange={(e) => {
@@ -602,31 +619,33 @@ export default function Users() {
                 </div>
               </div>
 
-              {/* Granted Permissions Summary Card */}
-              {roleId && (
-                <div className="p-3.5 bg-blue-50/80 border border-blue-200/80 rounded-2xl space-y-2 text-[11px] animate-fadeIn">
-                  <div className="flex items-center justify-between text-blue-900 font-bold">
-                    <span className="flex items-center space-x-1.5">
-                      <FileCheck className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Assigned Role:</span>
-                    </span>
-                    <span className="px-2 py-0.5 bg-blue-600 text-white rounded-md text-[10px] font-mono">
-                      {roles.find(r => r.id === parseInt(roleId))?.name || `Role #${roleId}`}
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {rolePermissions
-                      .filter(rp => rp.role_id === parseInt(roleId))
-                      .map(rp => (
-                        <span key={rp.permission_id} className="inline-flex items-center space-x-1 px-2 py-0.5 bg-white border border-blue-300 text-blue-800 rounded-md font-semibold text-[10px] shadow-2xs">
-                          <Check className="w-3 h-3 text-blue-600" />
-                          <span>{rp.code}</span>
-                        </span>
-                      ))}
-                  </div>
+              {/* Assigned Role & Selected Document Capability Display */}
+              <div className="p-3.5 bg-blue-50/80 border border-blue-200/80 rounded-2xl space-y-2 text-[11px] animate-fadeIn">
+                <div className="flex items-center justify-between text-blue-900 font-bold">
+                  <span className="flex items-center space-x-1.5">
+                    <FileCheck className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Assigned Role:</span>
+                  </span>
+                  <span className="px-2 py-0.5 bg-blue-600 text-white rounded-md text-[10px] font-mono font-bold">
+                    {roles.find(r => r.id === parseInt(roleId))?.name || (roleId === '2' ? 'RAHEE_ADMIN' : roleId === '8' ? 'IRCON_ADMIN' : roleId === '7' ? 'DOCUMENT_UPLOADER' : 'MANAGER_OVERSIGHT')}
+                  </span>
                 </div>
-              )}
+                
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {(documentCapability === 'Upload'
+                    ? ['Upload', 'Preview', 'Download']
+                    : ['Preview', 'Download']
+                  ).map((capName) => (
+                    <span
+                      key={capName}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1 bg-white border border-blue-200 text-blue-800 rounded-lg font-bold text-xs shadow-2xs"
+                    >
+                      <Check className="w-3.5 h-3.5 text-blue-600" />
+                      <span>{capName}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
 
               {/* Form Footer Actions */}
               <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
