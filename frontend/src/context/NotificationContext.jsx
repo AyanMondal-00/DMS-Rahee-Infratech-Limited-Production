@@ -10,6 +10,10 @@ export const NotificationProvider = ({ children }) => {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [currentLimit, setCurrentLimit] = useState(20);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
   const [emailLogs, setEmailLogs] = useState([]);
   const [socket, setSocket] = useState(null);
   const [toast, setToast] = useState(null);
@@ -18,23 +22,44 @@ export const NotificationProvider = ({ children }) => {
   const [alertState, setAlertState] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
 
-  // Fetch initial notifications & email logs from backend
-  const refreshNotifications = async () => {
+  // Fetch notifications from database API with specified limit and offset
+  const fetchNotifications = async (options = {}) => {
     if (!user) return;
-    try {
-      const res = await api.get('/notifications');
-      if (res.data.success) {
-        setNotifications(res.data.notifications);
-        setUnreadCount(res.data.unreadCount);
-      }
+    const limit = options.limit || currentLimit || 20;
+    const offset = options.offset || 0;
+    const append = options.append || false;
 
-      const emailRes = await api.get('/notifications/emails');
-      if (emailRes.data.success) {
-        setEmailLogs(emailRes.data.emailLogs);
+    try {
+      setLoadingNotifs(true);
+      const res = await api.get('/notifications', { params: { limit, offset } });
+      if (res.data.success) {
+        if (append) {
+          setNotifications(prev => {
+            const existingIds = new Set(prev.map(n => n.id));
+            const newItems = res.data.notifications.filter(n => !existingIds.has(n.id));
+            return [...prev, ...newItems];
+          });
+        } else {
+          setNotifications(res.data.notifications);
+        }
+        setUnreadCount(res.data.unreadCount || 0);
+        setTotalCount(res.data.totalCount || 0);
+        setHasMore(res.data.hasMore || false);
+        setCurrentLimit(limit);
       }
+      setLoadingNotifs(false);
     } catch (err) {
       console.error('Failed to load notifications:', err);
+      setLoadingNotifs(false);
     }
+  };
+
+  const refreshNotifications = async () => {
+    return fetchNotifications({ limit: currentLimit || 20, offset: 0 });
+  };
+
+  const loadViewAll = async (targetLimit = 50) => {
+    return fetchNotifications({ limit: targetLimit, offset: 0, append: false });
   };
 
   useEffect(() => {
@@ -55,8 +80,12 @@ export const NotificationProvider = ({ children }) => {
 
     // Listen for in-app real-time notifications
     newSocket.on('new_notification', (newNotif) => {
-      setNotifications(prev => [newNotif, ...prev]);
+      setNotifications(prev => {
+        if (prev.some(n => n.id === newNotif.id)) return prev;
+        return [newNotif, ...prev];
+      });
       setUnreadCount(prev => prev + 1);
+      setTotalCount(prev => prev + 1);
 
       // Show toast alert
       setToast({
@@ -111,6 +140,7 @@ export const NotificationProvider = ({ children }) => {
       const target = notifications.find(n => n.id === id);
       await api.delete(`/notifications/${id}`);
       setNotifications(prev => prev.filter(n => n.id !== id));
+      setTotalCount(prev => Math.max(0, prev - 1));
       if (target && (Number(target.is_read) === 0 || target.is_read === false)) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
@@ -124,6 +154,8 @@ export const NotificationProvider = ({ children }) => {
       await api.delete('/notifications/clear-all');
       setNotifications([]);
       setUnreadCount(0);
+      setTotalCount(0);
+      setHasMore(false);
     } catch (err) {
       console.error('Failed to clear all notifications:', err);
     }
@@ -235,6 +267,10 @@ export const NotificationProvider = ({ children }) => {
     <NotificationContext.Provider value={{
       notifications,
       unreadCount,
+      totalCount,
+      hasMore,
+      currentLimit,
+      loadingNotifs,
       emailLogs,
       toast,
       setToast,
@@ -249,6 +285,8 @@ export const NotificationProvider = ({ children }) => {
       permanentDeleteEmailLog,
       emptyEmailTrash,
       refreshNotifications,
+      fetchNotifications,
+      loadViewAll,
       showAlert,
       showConfirm
     }}>

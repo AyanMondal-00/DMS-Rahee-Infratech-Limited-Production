@@ -2,14 +2,17 @@ const db = require('../config/db');
 
 async function getNotifications(req, res) {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit || 20, 10), 1), 100);
+    const offset = Math.max(parseInt(req.query.offset || 0, 10), 0);
+
     const notifications = await db.query(
       `SELECT n.*, u.name as sender_name 
        FROM notifications n
        LEFT JOIN users u ON n.sender_id = u.id
        WHERE n.recipient_id = ?
        ORDER BY n.id DESC
-       LIMIT 100`,
-      [req.user.id]
+       LIMIT ? OFFSET ?`,
+      [req.user.id, limit, offset]
     );
 
     const unreadCountRes = await db.query(
@@ -19,10 +22,21 @@ async function getNotifications(req, res) {
     const rawCnt = unreadCountRes[0] ? (unreadCountRes[0].cnt !== undefined ? unreadCountRes[0].cnt : unreadCountRes[0]['COUNT(*)']) : 0;
     const unreadCount = parseInt(rawCnt || 0, 10);
 
+    const totalCountRes = await db.query(
+      "SELECT COUNT(*) as total FROM notifications WHERE recipient_id = ?",
+      [req.user.id]
+    );
+    const rawTotal = totalCountRes[0] ? (totalCountRes[0].total !== undefined ? totalCountRes[0].total : totalCountRes[0]['COUNT(*)']) : 0;
+    const totalCount = parseInt(rawTotal || 0, 10);
+
     return res.json({
       success: true,
       notifications,
-      unreadCount
+      unreadCount,
+      totalCount,
+      limit,
+      offset,
+      hasMore: (offset + notifications.length) < totalCount
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

@@ -56,13 +56,44 @@ const CustomBarTooltip = ({ active, payload }) => {
   return null;
 };
 
+// Format File Size Helper
+const formatFileSize = (bytes) => {
+  if (!bytes || isNaN(bytes) || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + (sizes[i] || 'B');
+};
+
+// Color mapping helper for document/file types
+const getFileTypeColor = (type, index) => {
+  const t = (type || '').toUpperCase();
+  if (t.includes('PDF')) return { bg: 'bg-rose-500', bar: '#f43f5e', text: 'text-rose-400', badge: 'bg-rose-500/10 text-rose-300 border-rose-500/20' };
+  if (t.includes('CAD') || t.includes('DWG') || t.includes('DXF')) return { bg: 'bg-cyan-500', bar: '#06b6d4', text: 'text-cyan-400', badge: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20' };
+  if (t.includes('EXCEL') || t.includes('XLS') || t.includes('CSV')) return { bg: 'bg-emerald-500', bar: '#10b981', text: 'text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' };
+  if (t.includes('WORD') || t.includes('DOC')) return { bg: 'bg-blue-500', bar: '#3b82f6', text: 'text-blue-400', badge: 'bg-blue-500/10 text-blue-300 border-blue-500/20' };
+  if (t.includes('IMAGE') || t.includes('PNG') || t.includes('JPG') || t.includes('JPEG')) return { bg: 'bg-amber-500', bar: '#f59e0b', text: 'text-amber-400', badge: 'bg-amber-500/10 text-amber-300 border-amber-500/20' };
+  if (t.includes('PPT') || t.includes('POWERPOINT')) return { bg: 'bg-purple-500', bar: '#a855f7', text: 'text-purple-400', badge: 'bg-purple-500/10 text-purple-300 border-purple-500/20' };
+  if (t.includes('ZIP') || t.includes('RAR') || t.includes('ARCHIVE')) return { bg: 'bg-indigo-500', bar: '#6366f1', text: 'text-indigo-400', badge: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' };
+
+  const fallbackColors = [
+    { bg: 'bg-sky-500', bar: '#0ea5e9', text: 'text-sky-400', badge: 'bg-sky-500/10 text-sky-300 border-sky-500/20' },
+    { bg: 'bg-violet-500', bar: '#8b5cf6', text: 'text-violet-400', badge: 'bg-violet-500/10 text-violet-300 border-violet-500/20' },
+    { bg: 'bg-teal-500', bar: '#14b8a6', text: 'text-teal-400', badge: 'bg-teal-500/10 text-teal-300 border-teal-500/20' },
+    { bg: 'bg-pink-500', bar: '#ec4899', text: 'text-pink-400', badge: 'bg-pink-500/10 text-pink-300 border-pink-500/20' },
+  ];
+  return fallbackColors[index % fallbackColors.length];
+};
+
 export default function Dashboard() {
   const { user, hasPermission } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [charts, setCharts] = useState(null);
+  const [storageBreakdown, setStorageBreakdown] = useState([]);
   const [recentLogs, setRecentLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [mobileStorageOpen, setMobileStorageOpen] = useState(false);
 
   const fetchDashboard = useCallback(async (isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -71,6 +102,7 @@ export default function Dashboard() {
       if (res.data.success) {
         setMetrics(res.data.metrics);
         setCharts(res.data.charts);
+        setStorageBreakdown(res.data.storageBreakdown || res.data.charts?.storageBreakdown || res.data.charts?.categoryBreakdown || []);
         setRecentLogs(res.data.recentAuditLogs || []);
       }
     } catch (err) {
@@ -96,6 +128,7 @@ export default function Dashboard() {
   const PIE_COLORS = ['#3b82f6', '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6'];
   const categoryData = charts?.categoryBreakdown || charts?.categoryChartData || [];
   const companyData = charts?.companyBreakdown || [];
+  const storageItems = storageBreakdown.length > 0 ? storageBreakdown : (categoryData || []);
 
   if (loading) {
     return (
@@ -130,10 +163,10 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Metrics KPI Cards (4 Balanced Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Metrics KPI Cards (5 Cards including Storage with Hover Breakdown) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         
-        {/* Total Documents */}
+        {/* 1. Total Documents */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider truncate">Total Documents</span>
@@ -145,21 +178,132 @@ export default function Dashboard() {
           <p className="text-[11px] text-slate-400 mt-1 truncate">Uploaded &amp; accessible files</p>
         </div>
 
-        {/* Approved Documents */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow min-w-0">
+        {/* 2. Total Storage with Hover Pop-up Breakdown */}
+        <div 
+          className="relative group bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 min-w-0 cursor-pointer select-none"
+          onClick={() => setMobileStorageOpen(prev => !prev)}
+          tabIndex={0}
+        >
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider truncate">Approved Files</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-              <FileCheck className="w-4 h-4" />
+            <div className="flex items-center space-x-1.5 truncate">
+              <span className="text-xs font-bold uppercase tracking-wider truncate">Storage</span>
+              <span className="flex h-2 w-2 relative" title="Storage Metrics Active">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
+              </span>
+            </div>
+            <div className="p-2 bg-violet-50 text-violet-600 rounded-xl group-hover:bg-violet-600 group-hover:text-white transition-colors duration-200">
+              <HardDrive className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-emerald-700 truncate">{metrics?.finalApproved || 0}</p>
-          <p className="text-[11px] text-slate-400 mt-1 truncate">
-            {metrics?.pendingReviews ? `${metrics.pendingReviews} in review workflow` : 'Fully approved documents'}
+
+          <p className="text-2xl sm:text-3xl font-black text-slate-900 truncate">
+            {formatFileSize(metrics?.totalStorageBytes)}
           </p>
+
+          <div className="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+            <span className="truncate">Database storage</span>
+            <span className="inline-flex items-center text-violet-600 font-semibold text-[10px] bg-violet-50 px-1.5 py-0.5 rounded-md border border-violet-100 group-hover:bg-violet-100 transition-colors">
+              Breakdown ↗
+            </span>
+          </div>
+
+          {/* Hover Pop-up Card (Document Type Breakdown) */}
+          <div 
+            className={`absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 w-72 sm:w-80 bg-slate-900/95 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-slate-700/80 z-50 transition-all duration-200 ease-out ${
+              mobileStorageOpen 
+                ? 'opacity-100 visible translate-y-0 pointer-events-auto' 
+                : 'opacity-0 invisible translate-y-2 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Pop-up Arrow pointer */}
+            <div className="absolute -top-1.5 left-8 sm:left-1/2 sm:-translate-x-1/2 w-3 h-3 bg-slate-900 border-t border-l border-slate-700 rotate-45"></div>
+
+            <div className="relative z-10 space-y-3">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1.5 bg-violet-500/20 text-violet-400 rounded-lg border border-violet-500/30">
+                    <Layers className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-100 uppercase tracking-wider">Storage Breakdown</h4>
+                    <p className="text-[10px] text-slate-400">Size by document file type</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-mono font-black text-violet-300 block">
+                    {formatFileSize(metrics?.totalStorageBytes)}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {metrics?.totalDocuments || 0} files
+                  </span>
+                </div>
+              </div>
+
+              {/* Breakdown Rows */}
+              {storageItems && storageItems.length > 0 ? (
+                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                  {storageItems.map((item, idx) => {
+                    const rawSize = Number(item.totalBytes ?? item.total_size ?? 0);
+                    const totalBytes = Number(metrics?.totalStorageBytes || 0);
+                    const percentage = totalBytes > 0 
+                      ? Math.round((rawSize / totalBytes) * 100) 
+                      : (item.percentage || 0);
+                    const fileCount = Number(item.count || 0);
+                    const color = getFileTypeColor(item.category, idx);
+
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-1.5 truncate">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${color.bg}`} />
+                            <span className="font-semibold text-slate-200 truncate">{item.category}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              ({fileCount} {fileCount === 1 ? 'doc' : 'docs'})
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1.5 shrink-0 font-mono text-[11px]">
+                            <span className="text-slate-100 font-bold">{formatFileSize(rawSize)}</span>
+                            <span className="text-violet-400 text-[10px] font-bold">({percentage}%)</span>
+                          </div>
+                        </div>
+
+                        {/* Visual Progress Bar */}
+                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{ 
+                              width: `${Math.max(percentage, 3)}%`,
+                              backgroundColor: color.bar || '#8b5cf6' 
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-3 text-center text-xs text-slate-400 italic">
+                  No storage breakdown data recorded yet.
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+                <span>Average size:</span>
+                <span className="font-mono text-slate-200 font-bold">
+                  {formatFileSize(metrics?.avgSizeBytes || (metrics?.totalStorageBytes && metrics?.totalDocuments ? Math.round(metrics.totalStorageBytes / metrics.totalDocuments) : 0))} / file
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Total Folders */}
+      
+
+        {/* 4. Total Folders */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between text-slate-500 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider truncate">Total Folders</span>
@@ -175,7 +319,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Tenant Scope */}
+        {/* 5. Tenant Scope */}
         <div className="bg-white p-5 rounded-2xl border border-indigo-200 bg-indigo-50/20 shadow-sm hover:shadow-md transition-shadow min-w-0">
           <div className="flex items-center justify-between text-indigo-700 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider truncate">Tenant Scope</span>
