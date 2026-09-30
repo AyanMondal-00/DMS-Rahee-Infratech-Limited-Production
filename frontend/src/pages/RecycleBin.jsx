@@ -309,8 +309,6 @@ export default function RecycleBin() {
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-6 rounded-3xl text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="space-y-2 z-10">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-rose-500/20 text-rose-300 rounded-full text-xs font-semibold border border-rose-500/30">
-          </div>
           <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-3">
             Recycle Bin &amp; Restoration Console
           </h1>
