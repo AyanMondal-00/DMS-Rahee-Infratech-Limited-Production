@@ -5,3 +5,13 @@
     @apply bg-slate-100 text-slate-800 antialiased font-sans;
   }
 }
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

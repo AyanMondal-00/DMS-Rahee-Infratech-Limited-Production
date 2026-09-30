@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 import DocumentPreviewModal from '../components/DocumentPreviewModal';
@@ -17,7 +17,7 @@ import {
   Lock, 
   Folder, 
   FolderPlus, 
-  FolderOpen,
+  FolderOpen, 
   X, 
   Shield, 
   ShieldAlert, 
@@ -34,6 +34,7 @@ import {
   ArrowRight,
   ArrowUp,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   HardDrive,
   Calendar,
@@ -281,6 +282,49 @@ export default function Documents() {
 
     return trail;
   }, [selectedFolderId, folders]);
+
+  // Breadcrumb Horizontal Overflow & Arrow Scrolling
+  const breadcrumbContainerRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkBreadcrumbScroll = () => {
+    const el = breadcrumbContainerRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  };
+
+  const scrollBreadcrumbLeft = () => {
+    if (breadcrumbContainerRef.current) {
+      breadcrumbContainerRef.current.scrollBy({ left: -160, behavior: 'smooth' });
+    }
+  };
+
+  const scrollBreadcrumbRight = () => {
+    if (breadcrumbContainerRef.current) {
+      breadcrumbContainerRef.current.scrollBy({ left: 160, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    const timer1 = setTimeout(() => {
+      checkBreadcrumbScroll();
+      const el = breadcrumbContainerRef.current;
+      if (el) {
+        el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+      }
+    }, 50);
+
+    const timer2 = setTimeout(checkBreadcrumbScroll, 200);
+    window.addEventListener('resize', checkBreadcrumbScroll);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      window.removeEventListener('resize', checkBreadcrumbScroll);
+    };
+  }, [breadcrumbTrail, selectedFolderId]);
 
   // Folder Creation Modal state
   const [showFolderModal, setShowFolderModal] = useState(false);
@@ -1054,10 +1098,27 @@ export default function Documents() {
           </button>
         </div>
 
-        {/* Explorer Address Bar with Clickable Breadcrumbs */}
-        <div className="flex-1 flex items-center justify-between h-7 px-2.5 bg-slate-50 hover:bg-white border border-slate-300 hover:border-blue-400 focus-within:border-blue-500 rounded-lg transition overflow-x-auto overflow-y-hidden">
+        {/* Explorer Address Bar with Clickable Breadcrumbs & Horizontal Arrow Navigation */}
+        <div className="flex-1 flex items-center h-7 px-1.5 bg-slate-50 hover:bg-white border border-slate-300 hover:border-blue-400 focus-within:border-blue-500 rounded-lg transition min-w-0 relative">
           
-          <div className="flex items-center space-x-1 min-w-0 flex-1">
+          {/* Left Arrow Button (Appears when breadcrumbs are scrolled right) */}
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={scrollBreadcrumbLeft}
+              title="Scroll breadcrumbs left"
+              className="p-0.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded shrink-0 transition mr-1 bg-white border border-slate-300 shadow-2xs"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Scrollable Breadcrumbs Container without scrollbar */}
+          <div 
+            ref={breadcrumbContainerRef}
+            onScroll={checkBreadcrumbScroll}
+            className="flex items-center space-x-1 flex-1 min-w-0 overflow-x-auto overflow-y-hidden scroll-smooth no-scrollbar"
+          >
             {/* Root Drive / Bikramshila Drive Icon */}
             <button
               type="button"
@@ -1097,8 +1158,20 @@ export default function Documents() {
             })}
           </div>
 
+          {/* Right Arrow Button (Appears when breadcrumbs overflow to the right) */}
+          {canScrollRight && (
+            <button
+              type="button"
+              onClick={scrollBreadcrumbRight}
+              title="Scroll breadcrumbs right"
+              className="p-0.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded shrink-0 transition ml-1 bg-white border border-slate-300 shadow-2xs"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {/* Refresh Button at the right end of address bar */}
-          <div className="shrink-0 pl-1.5 flex items-center">
+          <div className="shrink-0 pl-1.5 flex items-center border-l border-slate-200 ml-1">
             <button
               type="button"
               onClick={() => {
