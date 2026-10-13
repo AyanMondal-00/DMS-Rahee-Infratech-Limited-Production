@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const documentController = require('../controllers/document.controller');
-const reviewController = require('../controllers/review.controller');
+
 const { authenticateToken } = require('../middleware/auth.middleware');
 const { enforceTenantIsolation } = require('../middleware/tenant.middleware');
 const { requirePermission } = require('../middleware/permission.middleware');
@@ -32,11 +32,6 @@ router.get('/:id', documentController.getDocumentById);
 router.get('/:id/preview', requirePermission('preview'), documentController.previewDocument);
 router.get('/:id/download', requirePermission('download'), documentController.downloadDocument);
 
-// Revision upload (V1.1, V1.2)
-router.post('/:id/versions', requirePermission('edit'), handleUpload(upload.single('file')), documentController.uploadNewVersion);
-
-// Workflow Review & Approval Action
-router.post('/:id/review', requirePermission('approve_reject', 'final_approve'), reviewController.processReviewAction);
 
 // Archival Policy Manual / Scheduled Trigger (Admin / System)
 router.post('/run-archival-policy', documentController.triggerArchivalPolicy);

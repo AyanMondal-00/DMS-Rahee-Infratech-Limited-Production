@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { 
   LayoutDashboard, 
   FileText, 
-  CheckSquare, 
   Users, 
   Building2, 
   Mail, 
@@ -20,7 +19,6 @@ export default function Sidebar() {
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: true },
     { to: '/documents', label: 'Document Repository', icon: FileText, show: true },
-    { to: '/reviews', label: 'Workflow Reviews', icon: CheckSquare, show: false },
     { to: '/users', label: 'Users & Roles', icon: Users, show: isSuperAdmin },
     { to: '/organizations', label: 'Tenant Organizations', icon: Building2, show: isSuperAdmin },
     { to: '/recycle-bin', label: 'Recycle Bin', icon: Trash2, show: isSuperAdmin },

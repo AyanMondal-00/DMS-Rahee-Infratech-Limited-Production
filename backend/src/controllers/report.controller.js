@@ -21,40 +21,13 @@ async function getDashboardMetrics(req, res) {
     );
     const totalDocuments = totalDocsRes[0] ? (totalDocsRes[0].cnt || totalDocsRes[0]['COUNT(*)'] || 0) : 0;
 
-    // 2. Pending Reviews breakdown
-    const pendingReview1Res = await db.query(
-      `SELECT COUNT(*) as cnt FROM documents d ${tenantCondition} AND d.status = 'PENDING_REVIEW_1'`,
-      params
-    );
-    const pendingReview1 = pendingReview1Res[0] ? Number(pendingReview1Res[0].cnt || 0) : 0;
-
-    const pendingReview2Res = await db.query(
-      `SELECT COUNT(*) as cnt FROM documents d ${tenantCondition} AND d.status = 'PENDING_REVIEW_2'`,
-      params
-    );
-    const pendingReview2 = pendingReview2Res[0] ? Number(pendingReview2Res[0].cnt || 0) : 0;
-
-    const finalApprovalPendingRes = await db.query(
-      `SELECT COUNT(*) as cnt FROM documents d ${tenantCondition} AND d.status = 'FINAL_APPROVAL_PENDING'`,
-      params
-    );
-    const finalApprovalPending = finalApprovalPendingRes[0] ? Number(finalApprovalPendingRes[0].cnt || 0) : 0;
-
-    const pendingReviews = pendingReview1 + pendingReview2 + finalApprovalPending;
-
-    // 3. Rejected Documents
-    const rejectedRes = await db.query(
-      `SELECT COUNT(*) as cnt FROM documents d ${tenantCondition} AND d.status = 'REJECTED'`,
-      params
-    );
-    const rejectedDocuments = rejectedRes[0] ? Number(rejectedRes[0].cnt || 0) : 0;
-
-    // 4. Final Approved Documents
-    const finalApprovedRes = await db.query(
-      `SELECT COUNT(*) as cnt FROM documents d ${tenantCondition} AND d.status IN ('FINAL_APPROVED', 'APPROVED')`,
-      params
-    );
-    const finalApproved = finalApprovedRes[0] ? Number(finalApprovedRes[0].cnt || 0) : 0;
+    // Active Documents count
+    const finalApproved = totalDocuments;
+    const pendingReviews = 0;
+    const pendingReview1 = 0;
+    const pendingReview2 = 0;
+    const finalApprovalPending = 0;
+    const rejectedDocuments = 0;
 
     // 5. Velocity & Storage Metrics
     const storageRes = await db.query(
@@ -82,8 +55,7 @@ async function getDashboardMetrics(req, res) {
     const uploadsThisMonth = velocityRes[0] ? Number(velocityRes[0].uploads_month || 0) : 0;
 
     // Approval rate %
-    const totalCompleted = finalApproved + rejectedDocuments;
-    const approvalRate = totalCompleted > 0 ? Math.round((finalApproved / totalCompleted) * 100) : 100;
+    const approvalRate = 100;
 
     // 6. Ingestion Timeline (Last 14 Days)
     const timelineRes = await db.query(
@@ -116,46 +88,9 @@ async function getDashboardMetrics(req, res) {
       });
     }
 
-    // 7. My Pending Actions Count & Items List
-    let myPendingActions = 0;
-    let myPendingItems = [];
-    let pendingCondition = null;
-    let pendingParams = [];
-
-    if (['RAHEE_ADMIN_REVIEWER', 'IRCON_ADMIN_REVIEWER', 'REVIEWER_1'].includes(req.user.role_name)) {
-      pendingCondition = `WHERE (d.organization_id = ? OR d.organization_id IS NULL) AND (d.is_deleted = 0 OR d.is_deleted IS NULL) AND d.status = 'PENDING_REVIEW_1'`;
-      pendingParams = [req.user.organization_id];
-    } else if (['STEP2_REVIEWER', 'REVIEWER_2'].includes(req.user.role_name)) {
-      pendingCondition = `WHERE (d.organization_id = ? OR d.organization_id IS NULL) AND (d.is_deleted = 0 OR d.is_deleted IS NULL) AND d.status = 'PENDING_REVIEW_2'`;
-      pendingParams = [req.user.organization_id];
-    } else if (req.user.role_name === 'FINAL_APPROVER') {
-      pendingCondition = `WHERE (d.organization_id = ? OR d.organization_id IS NULL) AND (d.is_deleted = 0 OR d.is_deleted IS NULL) AND d.status = 'FINAL_APPROVAL_PENDING'`;
-      pendingParams = [req.user.organization_id];
-    } else if (req.user.role_name === 'DOCUMENT_UPLOADER' || req.user.role_name === 'UPLOAD_USER') {
-      pendingCondition = `WHERE d.uploaded_by = ? AND (d.is_deleted = 0 OR d.is_deleted IS NULL) AND d.status = 'REJECTED'`;
-      pendingParams = [req.user.id];
-    }
-
-    if (pendingCondition) {
-      const myPendingRes = await db.query(
-        `SELECT COUNT(*) as cnt FROM documents d ${pendingCondition}`,
-        pendingParams
-      );
-      myPendingActions = myPendingRes[0] ? Number(myPendingRes[0].cnt || 0) : 0;
-
-      myPendingItems = await db.query(
-        `SELECT d.id, d.title, d.status, d.document_type, d.category, d.current_version_number, d.created_at,
-                u.name as uploader_name, u.email as uploader_email,
-                o.name as organization_name, o.code as organization_code
-         FROM documents d 
-         LEFT JOIN users u ON d.uploaded_by = u.id 
-         LEFT JOIN organizations o ON d.organization_id = o.id
-         ${pendingCondition}
-         ORDER BY d.updated_at DESC
-         LIMIT 6`,
-        pendingParams
-      );
-    }
+    // 7. My Pending Actions Count & Items List (Workflow review inactive)
+    const myPendingActions = 0;
+    const myPendingItems = [];
 
     // 8. Documents Breakdown by Status
     const statusChartData = await db.query(

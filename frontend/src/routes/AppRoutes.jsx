@@ -6,7 +6,6 @@ import Dashboard from '../pages/Dashboard';
 import Documents from '../pages/Documents';
 import UploadDocument from '../pages/UploadDocument';
 import DocumentDetail from '../pages/DocumentDetail';
-import Reviews from '../pages/Reviews';
 import Users from '../pages/Users';
 import Organizations from '../pages/Organizations';
 import EmailActivity from '../pages/EmailActivity';
@@ -25,7 +24,7 @@ export default function AppRoutes() {
         <Route path="/documents" element={<Documents />} />
         <Route path="/documents/upload" element={<UploadDocument />} />
         <Route path="/documents/:id" element={<DocumentDetail />} />
-        <Route path="/reviews" element={<Reviews />} />
+        <Route path="/reviews" element={<Navigate to="/documents" replace />} />
         <Route path="/users" element={<Users />} />
         <Route path="/organizations" element={<Organizations />} />
         <Route path="/recycle-bin" element={<RecycleBin />} />

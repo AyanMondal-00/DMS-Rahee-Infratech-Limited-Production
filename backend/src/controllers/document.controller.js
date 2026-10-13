@@ -9,9 +9,7 @@ const { sendNotification, sendBatchNotifications, EXCLUDED_NOTIF_EMAILS } = requ
 const { logAudit, logBatchAudits } = require('../services/audit.service');
 const { runArchivalPolicy } = require('../services/archival.service');
 const { 
-  WORKFLOW_REVIEW_ENABLED,
   MULTI_TENANT_ISOLATION_ENABLED,
-  STATIC_VERSION_V1_ONLY,
   ONLY_SUPER_ADMIN_CAN_DELETE,
   OPERATIONAL_FOLDER_ENABLED,
   BKS_FOLDER_MODE
@@ -195,8 +193,8 @@ async function uploadDocument(req, res) {
       }
     }
 
-    const initialStatus = WORKFLOW_REVIEW_ENABLED ? 'PENDING_REVIEW_1' : 'FINAL_APPROVED';
-    const verTag = STATIC_VERSION_V1_ONLY ? 'General Version V1' : 'V1';
+    const initialStatus = 'FINAL_APPROVED';
+    const verTag = 'General Version V1';
 
     // 1. Instant SHA-256 Hash Resolution (Pre-computed on-the-fly during network stream by StreamHashingDiskStorage)
     const fileHashes = await Promise.all(
@@ -295,9 +293,7 @@ async function uploadDocument(req, res) {
           : `🔔 New Document Uploaded: ${doc.title}`;
         
         const notifMessage = isUploader
-          ? WORKFLOW_REVIEW_ENABLED 
-            ? `Your document "${doc.title}" (${verTag}) has been uploaded successfully and submitted for workflow review.`
-            : `Your document "${doc.title}" (${verTag}) has been uploaded successfully and saved to the repository.`
+          ? `Your document "${doc.title}" (${verTag}) has been uploaded successfully and saved to the repository.`
           : `A new document "${doc.title}" (${verTag}) was uploaded by ${req.user.name} and is available in the repository.`;
 
         batchNotifications.push({
@@ -336,10 +332,8 @@ async function uploadDocument(req, res) {
     return res.status(201).json({
       success: true,
       message: createdDocuments.length === 1
-        ? (WORKFLOW_REVIEW_ENABLED 
-            ? 'Document uploaded successfully and routed to Stage 1 Reviewer.' 
-            : 'Document uploaded successfully and saved to repository.')
-        : `${createdDocuments.length} documents uploaded successfully and routed to Stage 1 Reviewer.`,
+        ? 'Document uploaded successfully and saved to repository.'
+        : `${createdDocuments.length} documents uploaded successfully and saved to repository.`,
       documentId: createdDocuments[0]?.id,
       documents: createdDocuments,
       count: createdDocuments.length,
@@ -536,17 +530,6 @@ async function getDocumentById(req, res) {
       [id]
     );
 
-    // Fetch Review Trail History
-    const reviews = await db.query(
-      `SELECT r.*, u.name as reviewer_name, u.email as reviewer_email, v.version_number
-       FROM document_reviews r
-       LEFT JOIN users u ON r.reviewer_id = u.id
-       LEFT JOIN document_versions v ON r.document_version_id = v.id
-       WHERE r.document_id = ?
-       ORDER BY r.id ASC`,
-      [id]
-    );
-
     // Build folder trail and full path for nano horizontal bar
     let folderTrail = [];
     const targetFolderId = doc.folder_id || doc.original_folder_id;
@@ -586,166 +569,14 @@ async function getDocumentById(req, res) {
       success: true,
       document: doc,
       versions,
-      reviews,
-      workflow_enabled: WORKFLOW_REVIEW_ENABLED
+      reviews: [],
+      workflow_enabled: false
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 }
 
-// Upload New Version / Edit Document (Re-submission Cycle)
-async function uploadNewVersion(req, res) {
-  try {
-    if (req.user.is_super_admin) {
-      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      return res.status(403).json({ success: false, message: 'Forbidden: Super Admin accounts are restricted from uploading or editing document files.' });
-    }
-
-    const { id } = req.params;
-    const { change_description } = req.body;
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please attach the updated document file.' });
-    }
-
-    const docs = await db.query('SELECT * FROM documents WHERE id = ?', [id]);
-    const doc = docs[0];
-    if (!doc) {
-      return res.status(404).json({ success: false, message: 'Document not found.' });
-    }
-
-    // Tenant Check
-    if (MULTI_TENANT_ISOLATION_ENABLED && !req.user.is_super_admin && doc.organization_id !== req.user.organization_id) {
-      return res.status(403).json({ success: false, message: 'Forbidden: Cannot edit documents outside your organization.' });
-    }
-
-    // Uploader Ownership Check (Strictly original document uploader only can edit/submit revised versions)
-    const isUploader = doc.uploaded_by === req.user.id;
-    if (!isUploader) {
-      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-      return res.status(403).json({
-        success: false,
-        message: 'Forbidden: Only the original document uploader can edit or submit revised versions for this document.'
-      });
-    }
-
-    // Calculate new version index & number
-    const latestVersions = await db.query(
-      'SELECT version_index, version_number FROM document_versions WHERE document_id = ? ORDER BY version_index DESC LIMIT 1',
-      [id]
-    );
-
-    let newIndex = 1.0;
-    let newVersionNumber = 'V1.0';
-
-    if (doc.is_locked === 1 || doc.status === 'FINAL_APPROVED') {
-      // Re-upload on a Final Approved document -> Major Release Update (e.g. V1 FINAL -> V2.0 -> V2.1 -> V2.2...)
-      let currentMajor = 1;
-      if (latestVersions[0]) {
-        const lastIdx = parseFloat(latestVersions[0].version_index);
-        currentMajor = Math.floor(lastIdx);
-      }
-      const newMajor = currentMajor + 1;
-      newIndex = parseFloat(`${newMajor}.0`);
-      newVersionNumber = `V${newMajor}.0`;
-    } else {
-      // Minor revision re-upload before Final Approval (e.g. V1.0 -> V1.1 -> V1.2...)
-      const lastIndex = latestVersions[0] ? parseFloat(latestVersions[0].version_index) : 1.0;
-      newIndex = parseFloat((lastIndex + 0.1).toFixed(1));
-      newVersionNumber = `V${newIndex}`;
-    }
-
-    // Hash calculation
-    const filePath = req.file.path;
-    const fileHash = await calculateFileHash(filePath);
-    const versionStatus = WORKFLOW_REVIEW_ENABLED ? 'PENDING_REVIEW_1' : 'FINAL_APPROVED';
-
-    // Insert new version (never overwrites previous version records!)
-    const verRes = await db.query(
-      `INSERT INTO document_versions (document_id, organization_id, version_number, version_index, original_filename, storage_key, file_size, mime_type, file_hash, uploaded_by, change_description, review_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, doc.organization_id, newVersionNumber, newIndex, req.file.originalname, req.file.filename, req.file.size, req.file.mimetype, fileHash, req.user.id, change_description || 'Revision submitted', versionStatus]
-    );
-
-    const newVersionId = verRes.insertId;
-
-    // Update main document status
-    await db.query(
-      `UPDATE documents 
-       SET current_version_id = ?, current_version_number = ?, status = ?, is_locked = 0, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [newVersionId, newVersionNumber, versionStatus, id]
-    );
-
-    // Notify All Organization Stakeholders (Reviewers, Managers, Uploaders, Super Admin) of revision
-    const targetUsers = await db.query(
-      `SELECT DISTINCT u.id, u.name, u.email, u.role_id, r.name as role_name
-       FROM users u
-       LEFT JOIN roles r ON u.role_id = r.id
-       WHERE (u.organization_id = ? OR u.organization_id IS NULL OR r.name = 'SUPER_ADMIN')
-         AND (r.name IS NULL OR (r.name != 'MANAGER_OVERSIGHT' AND r.name != 'DOCUMENT_VIEWER'))
-         AND u.status = 'ACTIVE'`,
-      [doc.organization_id]
-    );
-
-    const EXCLUDED_NOTIF_EMAILS = [
-      'manish.p@rahee.com',
-      'ayush.k@rahee.com',
-      'manoj.g@rahee.com',
-      'arunabha.p@rahee.com'
-    ];
-
-    for (const targetUser of targetUsers) {
-      if (targetUser.email && EXCLUDED_NOTIF_EMAILS.includes(targetUser.email.toLowerCase())) {
-        continue; // Skip Manish Kumar Patra, Ayush Khaitan, Manoj Ghosh, and Arunabha Pyne
-      }
-
-      const isUploader = targetUser.id === req.user.id;
-      const notifTitle = isUploader 
-        ? `🔄 Revision Submitted (${newVersionNumber})` 
-        : `🔄 Document Revision Submitted: ${doc.title}`;
-      
-      const notifMessage = isUploader
-        ? `Your revised version ${newVersionNumber} for document "${doc.title}" has been uploaded successfully.`
-        : `Revised version ${newVersionNumber} of document "${doc.title}" was uploaded by ${req.user.name}.`;
-
-      sendNotification({
-        recipientId: targetUser.id,
-        recipientUser: targetUser,
-        senderId: req.user.id,
-        documentId: id,
-        organizationId: doc.organization_id,
-        title: notifTitle,
-        message: notifMessage,
-        type: 'REVISION_SUBMITTED',
-        emailDetails: {
-          documentTitle: doc.title,
-          documentVersion: newVersionNumber
-        }
-      }).catch(e => console.error('Revision notif error:', e.message));
-    }
-
-    await logAudit({
-      organization_id: doc.organization_id,
-      user_id: req.user.id,
-      action: 'VERSION_CREATED',
-      document_id: id,
-      version: newVersionNumber,
-      comment: `Uploaded revised version ${newVersionNumber} (${change_description || 'No comment'}).`,
-      req
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: `Revised version ${newVersionNumber} uploaded successfully and resubmitted for review.`,
-      versionNumber: newVersionNumber,
-      status: 'PENDING_REVIEW_1'
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
-  }
-}
 
 // Download Document File
 async function downloadDocument(req, res) {
@@ -1680,7 +1511,7 @@ async function restoreDocument(req, res) {
       return res.status(400).json({ success: false, message: 'Document is not currently archived.' });
     }
 
-    const restoredStatus = WORKFLOW_REVIEW_ENABLED ? 'PENDING_REVIEW_1' : 'FINAL_APPROVED';
+    const restoredStatus = 'FINAL_APPROVED';
 
     // Reset status back to active (FINAL_APPROVED or PENDING_REVIEW_1)
     await db.query(
@@ -1828,7 +1659,6 @@ module.exports = {
   uploadDocument,
   getDocuments,
   getDocumentById,
-  uploadNewVersion,
   downloadDocument,
   previewDocument,
   triggerArchivalPolicy,

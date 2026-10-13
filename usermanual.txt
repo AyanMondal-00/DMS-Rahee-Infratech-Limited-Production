@@ -1,0 +1,953 @@
+================================================================================
+ENTERPRISE DOCUMENT MANAGEMENT SYSTEM (EDMS)
+OFFICIAL SYSTEM USER MANUAL & GOVERNANCE SPECIFICATION
+================================================================================
+
+Document Reference : EDMS-RAHEE-IRCON-UM-2026-V1.0
+System Name        : Enterprise Document Management System (EDMS)
+Target Client      : Rahee Infratech Limited & Ircon International Limited
+Project Repository : Central Bikramshila Infrastructure Project Repository
+Author / Lead      : Enterprise Software Engineering Team
+Security Level     : Confidential / Corporate Internal & Client Stakeholders
+Release Date       : October 2026
+Standard Compliance: ISO/IEC/IEEE 26514:2018 (Systems and software engineering)
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+1.  DOCUMENT CONTROL & REVISION HISTORY
+2.  EXECUTIVE SUMMARY & SYSTEM PURPOSE
+3.  SYSTEM ARCHITECTURE & TECHNICAL SPECIFICATIONS
+4.  MASTER STAKEHOLDER REGISTRY, ROLES & CAPABILITIES MATRIX
+5.  GRANULAR ROLE-BASED ACCESS CONTROL (RBAC) MATRIX
+6.  CENTRAL BIKRAMSHILA REPOSITORY & DIRECTORY HIERARCHY
+7.  GETTING STARTED & AUTHENTICATION
+8.  USER INTERFACE & NAVIGATION TOUR
+9.  DASHBOARD & REAL-TIME BUSINESS INTELLIGENCE
+10. BIKRAMSHILA DOCUMENT DRIVE & DIRECTORY MANAGEMENT
+    10.1 Folder Traversal & Breadcrumb Navigation
+    10.2 Creating Subfolders
+    10.3 Renaming & Modifying Folder Properties
+    10.4 Granular Folder Access Control & Permission Rules
+    10.5 Search & Multi-Parametric Filtering
+11. DOCUMENT INGESTION & HIGH-SPEED UPLOADING
+    11.1 Authorized Uploaders Matrix
+    11.2 Document File Format Selection
+    11.3 Drag & Drop Batch Uploading
+    11.4 Real-Time SHA-256 Checksum & High-Speed Progress
+    11.5 Large File Storage & 500MB Payload Support
+    11.6 Anti-Malware & Dangerous Extension Shield
+12. IN-BROWSER HIGH-DEFINITION DOCUMENT PREVIEW ENGINE
+    12.1 Native PDF Canvas Viewer
+    12.2 Microsoft Word (DOC/DOCX) Viewer
+    12.3 Microsoft Excel (XLS/XLSX) Interactive Data Grid
+    12.4 Microsoft PowerPoint (PPT/PPTX) Slide Carousel
+    12.5 CAD 2D/3D Blueprint Visualizer (DWG, DXF, STL, OBJ, STEP, IGES)
+    12.6 High-Definition Image Rendering
+13. DOCUMENT DOWNLOAD, METADATA & VERSION CONTROL
+14. DOCUMENT LIFECYCLE GOVERNANCE & RECYCLE BIN
+    14.1 Manual Document Archival
+    14.2 1-Click Document Restoration
+    14.3 Super Admin Deletion Protection Policy
+    14.4 Central Recycle Bin & Recovery Vault
+15. WORKFLOW REVIEWS & APPROVAL INBOX
+16. NOTIFICATION ROUTING ENGINE & SYSTEM EMAIL OUTBOX
+    16.1 Notification Dispatch Rules by Company
+    16.2 In-App Notification Bell
+    16.3 System Email Outbox & Delivery Activity
+    16.4 Email Trash & Outbox Management
+17. USER MANAGEMENT & CREDENTIAL GOVERNANCE (SUPER ADMIN)
+    17.1 User Account Provisioning
+    17.2 Role & Capability Mapping
+    17.3 Password Reset & Account Unlocking
+    17.4 User Account Activation / Deactivation
+18. MULTI-TENANT ORGANIZATION MANAGEMENT
+19. SYSTEM AUDIT TRAILS & COMPLIANCE LOGGING
+20. ADVANCED REPORTS & ANALYTICS
+21. SYSTEM INSTALLATION, STARTUP & MAINTENANCE GUIDE
+    21.1 Infrastructure Prerequisites
+    21.2 Database Initialization & Schema Seeding
+    21.3 Backend REST & WebSocket Service Startup
+    21.4 Frontend Web Application Startup
+    21.5 Network Binding & Dynamic IP Resolution
+22. COMPLETE REST API REFERENCE
+23. TROUBLESHOOTING & FREQUENTLY ASKED QUESTIONS (FAQ)
+24. TECHNICAL SUPPORT & GOVERNANCE CONTACTS
+
+================================================================================
+1. DOCUMENT CONTROL & REVISION HISTORY
+================================================================================
+
+Document Title     : Official User Manual - Enterprise Document Management System
+Document ID        : EDMS-DOC-MAN-2026-FINAL
+Target Organizations:
+  - Rahee Infratech Limited (Company 1)
+  - Ircon International Limited (Company 2)
+  - Bikramshila Infrastructure Central Project Team
+
+Revision History:
+--------------------------------------------------------------------------------
+Version | Date        | Author                | Summary of Changes
+--------------------------------------------------------------------------------
+1.0.0   | 2026-10-01  | EDMS Engineering Team | Initial Master Production Manual
+                      |                       | covering Multi-Tenant Governance,
+                      |                       | Bikramshila Drive, CAD Viewers,
+                      |                       | RBAC Matrix, and Super Admin Vault.
+--------------------------------------------------------------------------------
+
+================================================================================
+2. EXECUTIVE SUMMARY & SYSTEM PURPOSE
+================================================================================
+
+The Enterprise Document Management System (EDMS) is a secure, high-throughput, 
+multi-tenant document governance platform engineered specifically for the 
+engineering, infrastructural, and administrative operations of:
+
+  1. RAHEE INFRATECH LIMITED (Company 1 / Contractor)
+  2. IRCON INTERNATIONAL LIMITED (Company 2 / Authority & Client)
+  3. BIKRAMSHILA INFRASTRUCTURE PROJECT (Joint Central Repository)
+
+Key Objectives of the Platform:
+--------------------------------
+1. Centralized Blueprints & CAD Repository:
+   A single, unified, structured digital vault for all civil, structural, 
+   track, architectural, and mechanical blueprints, contract documents, 
+   inspection certificates, and quality assurance logs.
+
+2. Strict Multi-Tenant Isolation with Universal Cross-Company Preview:
+   Complete tenant security and upload control per company branch under the 
+   central "Bikramshila" root directory, paired with open cross-company viewing 
+   and downloading rights for all authorized stakeholders.
+
+3. Granular Role-Based Access Control (RBAC):
+   Deterministic permissions mapping user designations (Super Admin, Admin, 
+   Execution Control, Manager, Reviewer, Viewer) to specific operational capabilities.
+
+4. High-Capacity Engineering Storage:
+   Direct disk-backed streaming storage capable of handling heavy CAD models, 
+   multi-page raster blueprints, and high-resolution engineering reports with 
+   generous 500MB payload limits and zero artificial file size caps.
+
+5. In-Browser Multi-Format Document Previews:
+   Zero-install in-browser rendering for PDF, Microsoft Word, Microsoft Excel, 
+   Microsoft PowerPoint, 2D/3D CAD Blueprints, and high-resolution images.
+
+6. Immutable Compliance & Audit Trail:
+   Continuous append-only logging of every user login, document upload, 
+   view, preview, download, modification, archival, restoration, and deletion.
+
+================================================================================
+3. SYSTEM ARCHITECTURE & TECHNICAL SPECIFICATIONS
+================================================================================
+
+The EDMS platform is built on a resilient, high-concurrency micro-architecture:
+
+```
++-------------------------------------------------------------------------+
+|                           CLIENT WEB BROWSER                            |
+|             (Google Chrome, Microsoft Edge, Mozilla Firefox)            |
++-------------------------------------------------------------------------+
+                                    |
+                         HTTP / HTTPS & WebSockets
+                                    |
+                                    v
++-------------------------------------------------------------------------+
+|                  FRONTEND APPLICATION (React 19 + Vite 8)               |
+|  - Dynamic API Host Resolver (Adapts to localhost, LAN IP, or Domain)   |
+|  - In-Browser CAD & Office Viewers (Mammoth, SheetJS, JSZip, PDF Canvas)|
+|  - Real-Time Live Sync Engine & Push Notifications (Socket.IO Client)   |
+|  - Responsive Tailwind CSS Interface with Explorer-style Folder Tree   |
++-------------------------------------------------------------------------+
+                                    |
+                           REST APIs & Socket.IO
+                                    |
+                                    v
++-------------------------------------------------------------------------+
+|                     BACKEND SERVICE (Node.js & Express 5)               |
+|  - JWT Stateless Authentication & Granular RBAC Permission Validator    |
+|  - High-Speed Multer Streaming Upload Engine (500MB payload support)    |
+|  - SHA-256 Real-time Cryptographic Checksum Calculator                  |
+|  - Notification Routing Dispatcher & HTML Email Transporter             |
+|  - Self-Healing Auto-Port Recovery & Database Heartbeat Daemon (45s)    |
++-------------------------------------------------------------------------+
+                    |                                   |
+         Disk Streaming I/O                     Pooled SQL Queries
+                    |                                   |
+                    v                                   v
++------------------------------------+ +----------------------------------+
+|    FILE STORAGE REPOSITORY         | |    MYSQL 8.0+ DATABASE ENGINE    |
+|  - Unlimited Disk Capacity         | |  - High-Resilience Connection    |
+|  - Path: backend/uploads/          | |    Pool (30 limit, keepAlive)    |
+|  - Unique UUID Storage Keys        | |  - Schema: enterprise_dms        |
+|  - Anti-Malware Binary Verifier    | |  - Auto-Retry on Transient Drops |
++------------------------------------+ +----------------------------------+
+```
+
+Technical Specifications Table:
+--------------------------------------------------------------------------------
+Layer               | Technology Stack           | Key Capability
+--------------------------------------------------------------------------------
+Frontend Framework  | React 19.x, Vite 8.x       | High-speed rendering & SPA navigation
+Styling & UI Icons  | Tailwind CSS 4, Lucide     | Modern, clean, responsive enterprise layout
+Charts & Analytics  | Recharts                   | Dynamic SVG/Canvas pie & bar charts
+Document Rendering  | Mammoth, SheetJS, JSZip    | Native Word/Excel/PPT/PDF in-browser preview
+Backend Service     | Node.js 18+, Express 5.x   | RESTful API & 500MB payload engine
+Real-Time Engine    | Socket.IO 4.x              | Instant notifications & live log streaming
+Database Engine     | MySQL 8.0+ / 5.7+          | Relational integrity & connection pooling
+Security & Crypto   | BcryptJS, JWT, Helmet      | Strong password hashing & token validation
+Storage Engine      | Local / SAN Disk Storage   | Unlimited volume capacity, streamed binaries
+--------------------------------------------------------------------------------
+
+================================================================================
+4. MASTER STAKEHOLDER REGISTRY, ROLES & CAPABILITIES MATRIX
+================================================================================
+
+The system includes 14 designated stakeholder accounts across Rahee Infratech, 
+Ircon International, and Global Super Administration:
+
+--------------------------------------------------------------------------------
+COMPANY 1: RAHEE INFRATECH LIMITED (Tenant Code: RAHEE | Org ID: 1)
+--------------------------------------------------------------------------------
+Sl | Stakeholder Name         | Email Address         | Designation       | Capability | Official Password
+---+--------------------------+-----------------------+-------------------+------------+------------------
+1  | Rahul Dey                | rahul.d@rahee.com     | Admin             | Upload     | R@hul#Dey2026
+2  | Somnath Mondal           | s.mondal@rahee.com    | Execution Control | Upload     | S@menath#Mondal2026
+3  | Kiran Sankar Chowdhury   | kiransankar.c@rahee.com| Manager          | Viewer     | K1ran#Sankar2026
+4  | Mukesh Kumar Prasad      | mukesh.p@rahee.com    | Manager           | Viewer     | M@kesh#Prasad2026
+5  | Pintu Bhukta             | pintu.b@rahee.com     | Manager           | Viewer     | P1ntu#Bhukta2026
+6  | Ayush Khaitan            | ayush.k@rahee.com     | Manager           | Viewer     | Ayu$h#Khaitan2026
+7  | Manoj Ghosh              | manoj.g@rahee.com     | Manager           | Viewer     | M@noj#Ghosh2026
+8  | Arunabha Pyne            | arunabha.p@rahee.com  | Manager           | Viewer     | Arun#Pyne2026
+9  | Manish Kumar Patra       | manish.p@rahee.com    | Viewer            | Viewer     | M@nish#Patra2026
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+COMPANY 2: IRCON INTERNATIONAL LIMITED (Tenant Code: IRCON | Org ID: 2)
+--------------------------------------------------------------------------------
+Sl | Stakeholder Name         | Email Address         | Designation       | Capability | Official Password
+---+--------------------------+-----------------------+-------------------+------------+------------------
+1  | Om Jha                   | om.jha@ircon.org      | Admin             | Upload     | Om#Jha2026
+2  | Shardu Kumar Rastogi     | shardu.rastogi@ircon.org| Execution Control | Viewer   | Sh@rdu#Rastogi2026
+3  | Chandra Bijay Singh      | chandra.singh@ircon.org| Review            | Viewer   | Ch@ndra#Singh2026
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+SUPER ADMINISTRATOR GOVERNANCE ACCOUNTS (Global Oversight)
+--------------------------------------------------------------------------------
+Sl | Stakeholder Name         | Email Address         | Designation       | Capability | Official Password
+---+--------------------------+-----------------------+-------------------+------------+------------------
+1  | Rajib Ghosh              | rajib.g@rahee.com     | Super Admin       | Viewer     | R@jib#Ghosh2026
+2  | Global System Admin      | superadmin@enterprise-dms.com | Super Admin | Viewer   | SuperAdmin@123Sec
+--------------------------------------------------------------------------------
+
+================================================================================
+5. GRANULAR ROLE-BASED ACCESS CONTROL (RBAC) MATRIX
+================================================================================
+
+The table below outlines the exact operational permissions granted to each user 
+account across all modules of the platform:
+
++----------------------------+--------+------+---------+----------+--------+---------+--------+---------+--------+--------+
+| User Account & Designation | Upload | View | Preview | Download | Edit   | Manage  | Manage | View    | Audit  | Delete |
+|                            | Docs   | Docs | In-App  | Binary   | Meta   | Folders | Users  | Reports | Logs   | Docs   |
++----------------------------+--------+------+---------+----------+--------+---------+--------+---------+--------+--------+
+| Rajib Ghosh (Super Admin)  |  NO    | YES  |   YES   |   YES    |  YES   |   YES   |  YES   |   YES   |  YES   | YES *1 |
+| Global System Admin        |  NO    | YES  |   YES   |   YES    |  YES   |   YES   |  YES   |   YES   |  YES   | YES *1 |
+| Rahul Dey (Rahee Admin)    |  YES   | YES  |   YES   |   YES    |  YES   |   YES   |  NO    |   YES   |  YES   |  NO    |
+| Somnath Mondal (Rahee)     |  YES   | YES  |   YES   |   YES    |  YES   |   NO    |  NO    |   YES   |  NO    |  NO    |
+| Kiran Sankar Chowdhury     |  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
+| Mukesh Kumar Prasad        |  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
+| Pintu Bhukta (Rahee)       |  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
+| Ayush Khaitan (Rahee)      |  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
+| Manoj Ghosh (Rahee)        |  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
+| Arunabha Pyne (Rahee)      |  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
+| Manish Kumar Patra (Rahee) |  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  NO    |  NO    |
+| Om Jha (Ircon Admin)       |  YES   | YES  |   YES   |   YES    |  YES   |   YES   |  NO    |   YES   |  YES   |  NO    |
+| Shardu Kumar Rastogi (Ircon|  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
+| Chandra Bijay Singh (Ircon)|  NO    | YES  |   YES   |   YES    |  NO    |   NO    |  NO    |   YES   |  YES   |  NO    |
++----------------------------+--------+------+---------+----------+--------+---------+--------+---------+--------+--------+
+
+*1 NOTE ON DOCUMENT DELETION:
+   Permanent deletion of documents from the repository is strictly restricted 
+   to Super Administrators (Rajib Ghosh and Global Admin). Any unauthorized 
+   deletion attempt by any other user results in an immediate HTTP 403 Forbidden 
+   rejection and logs a security violation alert in the audit trail.
+
+================================================================================
+6. CENTRAL BIKRAMSHILA REPOSITORY & DIRECTORY HIERARCHY
+================================================================================
+
+All project documents, drawings, certificates, and subfolders exist under a 
+structured, centralized directory structure known as the "Bikramshila Drive":
+
+```
+📁 Bikramshila (Primary Central Root Directory - Folder ID: 1)
+│
+├── 📂 RAHEE (Company 1 Branch - Folder ID: 2 | Rahee Infratech Limited)
+│   ├── 📁 Engineering & Drawings (Subfolder)
+│   │   ├── 📁 Track Blueprints (Deep Subfolder)
+│   │   └── 📁 Structural CAD Models
+│   ├── 📁 Quality Assurance & Inspection Logs (Operational Folder)
+│   ├── 📁 Contracts, Agreements & Tender Documents
+│   └── 📁 Site Safety & Compliance Certificates
+│
+└── 📂 IRCON (Company 2 Branch - Folder ID: 3 | Ircon International Limited)
+    ├── 📁 Physics & Design Specifications (Subfolder)
+    │   ├── 📁 Project Section 1 (Nested Subfolder)
+    │   └── 📁 Project Section 2 (Deep Nested Subfolder)
+    ├── 📁 Inspection Reports & Sign-Offs (Operational Folder)
+    ├── 📁 Track Specifications & Test Results
+    └── 📁 Authority Approvals & Work Orders
+```
+
+Directory Governance Principles:
+--------------------------------
+1. Central Project Governance:
+   Super Admin (Rajib Ghosh) oversees the entire Bikramshila repository, 
+   both corporate branches, and all child subfolders.
+2. Upload Branch Isolation:
+   - Rahee Uploaders (Rahul Dey, Somnath Mondal) upload strictly into 
+     Bikramshila/RAHEE and its subdirectories.
+   - Ircon Uploaders (Om Jha) upload strictly into Bikramshila/IRCON 
+     and its subdirectories.
+3. Universal Cross-Company Read Visibility:
+   All authenticated stakeholders from both Rahee and Ircon have full search, 
+   browse, preview, and download access to the complete Bikramshila directory tree.
+4. Unlimited Folder Nesting:
+   Admins can create nested subfolders to any depth (Level 1 to Level 5+), 
+   providing structured organization for complex engineering projects.
+
+================================================================================
+7. GETTING STARTED & AUTHENTICATION
+================================================================================
+
+7.1 Accessing the Web Application
+---------------------------------
+1. Open a modern web browser (Google Chrome, Microsoft Edge, or Firefox).
+2. Navigate to your organization's EDMS portal URL:
+   - Local / Development environment: http://localhost:5173
+   - Network / Production environment: http://<SERVER-IP>:5173 or https://dms.rahee-ircon.com
+
+7.2 Logging In
+--------------
+1. In the login screen, enter your official registered Email ID and Password.
+2. Click the "Sign In to Repository" button.
+3. Upon successful verification, an encrypted JSON Web Token (JWT) is issued, 
+   and you will be automatically redirected to your customized Dashboard.
+
+7.3 Security Lockout Protection
+-------------------------------
+- To protect against brute-force intrusion, if 5 consecutive failed login 
+  attempts occur on an account, the account is temporarily locked for 15 minutes.
+- Super Admin (Rajib Ghosh) can immediately unlock any account or reset its 
+  password from the Users Management console.
+
+7.4 Logging Out
+---------------
+- Click your Profile / Name badge at the top-right corner of the navigation bar 
+  and select "Sign Out".
+- Your active session token is immediately cleared from browser memory.
+
+================================================================================
+8. USER INTERFACE & NAVIGATION TOUR
+================================================================================
+
+The EDMS user interface is divided into clean, functional sections:
+
+1. Left Navigation Sidebar:
+   - Dashboard: Executive overview, real-time KPI metrics, and live charts.
+   - Central Repository (Documents): Full directory tree, document browser, and search.
+   - Upload Document: High-speed single and batch document upload portal.
+   - Reviews Inbox: Queue of documents awaiting review or approval decision.
+   - Users Management: User provisioning and access control (Super Admin only).
+   - Tenant Organizations: Multi-tenant management (Super Admin only).
+   - Recycle Bin: Document and folder recovery console (Super Admin only).
+   - Analytics & Reports: System metrics, file format breakdowns, and trends.
+   - Email Outbox: System-generated email notifications and delivery logs.
+   - Audit Logs: Immutable system activity trail.
+
+2. Top Navigation Bar:
+   - Active Organization Badge: Identifies active tenant (Rahee, Ircon, or Global).
+   - Global Search Bar: Instant lookup across titles, filenames, and folders.
+   - Real-Time Notification Bell: Instant dropdown alert with unread badge counter.
+   - User Profile Menu: Displays logged-in user name, designation, and logout button.
+
+================================================================================
+9. DASHBOARD & REAL-TIME BUSINESS INTELLIGENCE
+================================================================================
+
+The Dashboard (/dashboard) provides live visibility into repository metrics:
+
+9.1 Key Metric Cards (KPIs)
+----------------------------
+1. Total Documents: Total count of active, accessible files in the repository.
+2. Storage Volume: Total disk storage occupied by documents and CAD models.
+   * Hover Pop-up Card: Hovering over the Storage card displays an interactive 
+     breakdown of storage usage by file type (PDF, CAD, Word, Excel, Images, PPT) 
+     with percentage bars and file counts.
+   * Storage card visibility is restricted to Om Jha, Rahul Dey, and Rajib Ghosh.
+3. Total Folders: Count of directory hierarchy nodes under Rahee and Ircon branches.
+4. Tenant Scope: Displays whether the current view is isolated to Rahee, Ircon, 
+   or global project scope.
+
+9.2 Visual Analytics Charts
+---------------------------
+- Document Type Distribution (Pie Chart): Interactive donut chart showing the 
+  percentage and count of PDF documents, CAD drawings, Excel sheets, Word files, 
+  PowerPoint presentations, and images.
+- Company Document Distribution (Bar Chart): Compares total active document 
+  volume between Rahee Infratech and Ircon International.
+- Live Auto-Sync: The dashboard automatically refreshes data every 5 seconds 
+  while the browser tab is active, or instantly via the "Sync Live" button.
+- Recent Audit Feed: Displays the latest 5 audit trail events with timestamps 
+  and user identifiers.
+
+================================================================================
+10. BIKRAMSHILA DOCUMENT DRIVE & DIRECTORY MANAGEMENT
+================================================================================
+
+The Central Documents page (/documents) functions identically to modern cloud 
+drives and Windows Explorer:
+
+10.1 Folder Traversal & Breadcrumb Navigation
+--------------------------------------------
+- Bikramshila Drive Root: Clicking the root drive displays the main company 
+  branches (`RAHEE` and `IRCON`).
+- Explorer-Style Path Bar: The top path bar displays the exact directory hierarchy:
+  Example: Bikramshila Drive > RAHEE > Engineering & Drawings > Track Blueprints
+- History Navigation: Use the "Back", "Forward", and "Up to Parent" buttons to 
+  navigate between directories without losing your search context.
+- Double-Click Traversal: Click any folder card in the view to immediately 
+  enter that subdirectory.
+
+10.2 Creating Subfolders
+------------------------
+1. Navigate to the desired parent directory (e.g. `Bikramshila/RAHEE`).
+2. Click the "+ New Folder" button at the top-right of the directory view.
+3. Enter the Folder Name (e.g., "Quality Inspection Reports Q4").
+4. Optional: Enter a description.
+5. Optional: Toggle "Operational Folder" if this folder is exempt from auto-archival.
+6. Click "Create Folder". The folder is immediately available for uploads.
+* Note: Creating folders is permitted for Rahul Dey, Om Jha, and Super Admins.
+
+10.3 Renaming & Modifying Folder Properties
+-------------------------------------------
+1. Locate the folder card or navigate inside the folder.
+2. Click the "Rename Folder" button or settings icon.
+3. Update the folder title or description and click "Save Changes".
+
+10.4 Granular Folder Access Control & Permission Rules
+------------------------------------------------------
+1. Click the "Access Control / Permissions" icon on any folder.
+2. Add specific role-based or user-specific permission rules:
+   - Full Control (Upload, Edit, Preview, Download)
+   - Read Only (Preview & Download)
+3. Check "Apply recursively to all subfolders" to inherit permissions downward.
+4. Click "Save Permissions".
+
+10.5 Search & Multi-Parametric Filtering
+----------------------------------------
+- Keyword Search: Type any keyword to filter documents by title or filename in real time.
+- Date Range Filters: Select "From Date" and "To Date" to isolate documents uploaded 
+  during specific project periods.
+- File Format Dropdown: Filter by PDF, CAD, Word, Excel, PowerPoint, or Images.
+- Company Filter: Switch between Rahee Infratech, Ircon International, or All.
+
+================================================================================
+11. DOCUMENT INGESTION & HIGH-SPEED UPLOADING
+================================================================================
+
+11.1 Authorized Uploaders Matrix
+--------------------------------
+To maintain strict data integrity, document uploading is permitted exclusively to:
+- Rahee Infratech: Rahul Dey (Admin) and Somnath Mondal (Execution Control).
+- Ircon International: Om Jha (Admin).
+* For all Viewer and Manager accounts, upload actions are disabled.
+
+11.2 Step-by-Step Document Upload Procedure
+-------------------------------------------
+1. Navigate to "Upload Document" in the left sidebar (/documents/upload).
+2. Step 1 - Select Document File Format:
+   Select the required file category from the dropdown:
+   - PDF Documents (.pdf)
+   - CAD Drawings / 3D Models (.dwg, .dxf, .stl, .obj, .step, .stp, .iges)
+   - Microsoft Word (.doc, .docx)
+   - Microsoft Excel (.xls, .xlsx)
+   - Microsoft PowerPoint (.ppt, .pptx)
+   - Images (.jpg, .jpeg, .png, .webp, .svg)
+3. Step 2 - Select Destination Folder:
+   Use the tree selector to choose the exact branch folder (e.g., `Bikramshila/RAHEE/Engineering`).
+4. Step 3 - Select or Drop Document File(s):
+   - Click the dropzone to open the Windows File Explorer (pre-filtered for your chosen format).
+   - Or drag and drop single or multiple files directly onto the dropzone.
+5. Review & Edit Titles in Staging Area:
+   - Each staged file displays its name, size, and an editable Document Title field.
+   - Edit the document title if a formal naming convention is required.
+   - Remove individual files or click "Add More Files" to add additional files.
+6. Click "Upload All Documents":
+   - The animated Upload Modal appears, tracking real-time data transfer in Megabytes (MB) 
+     and percentage progress.
+   - Cryptographic SHA-256 signatures are calculated and verified.
+   - Upon completion, the system redirects you directly to the uploaded file.
+
+11.3 High-Capacity Performance & 500MB Support
+----------------------------------------------
+- File Size Capacity: The upload pipeline supports files up to 500MB+ per file.
+- Direct Disk Streaming: Files stream directly from client to server disk storage 
+  without intermediate memory bottlenecks.
+- Batch Ingestion: Multiple drawings can be uploaded simultaneously in a single transaction.
+
+11.4 Anti-Malware & Extension Protection
+----------------------------------------
+- Prohibited Extensions: Executables and scripts (.exe, .bat, .cmd, .sh, .vbs, .msi, .dll) 
+  are rejected immediately at the browser boundary and backend validator.
+
+================================================================================
+12. IN-BROWSER HIGH-DEFINITION DOCUMENT PREVIEW ENGINE
+================================================================================
+
+The EDMS includes built-in in-browser previewers for all supported file formats:
+
+12.1 Native PDF Canvas Viewer (.pdf)
+------------------------------------
+- Native multi-page PDF rendering directly in the browser.
+- Zoom in/out, page jumping, text selection, and print integration.
+
+12.2 Microsoft Word Viewer (.doc, .docx)
+----------------------------------------
+- Rendered via high-fidelity Mammoth HTML parsing engine.
+- Preserves paragraph formatting, heading styles, bullet points, tables, and embedded images.
+
+12.3 Microsoft Excel Interactive Spreadsheet (.xls, .xlsx)
+----------------------------------------------------------
+- Rendered via SheetJS data engine.
+- Interactive multi-sheet tab switching, column sorting, formulas, cell styling, and responsive scrolling.
+
+12.4 Microsoft PowerPoint Slide Carousel (.ppt, .pptx)
+------------------------------------------------------
+- Rendered via JSZip XML slide extraction.
+- Interactive slide carousel allowing forward and backward slide review.
+
+12.5 CAD 2D/3D Blueprint Visualizer (.dwg, .dxf, .stl, .obj, .step, .stp, .iges)
+--------------------------------------------------------------------------------
+- Specialized canvas renderer for engineering CAD models and blueprints.
+- 3D Orbit Control: Click and drag to rotate models in full 360-degree 3D space.
+- 2D Blueprint Pan & Zoom: Pan across large track alignment drawings and blueprints.
+
+12.6 High-Definition Image Rendering (.png, .jpg, .jpeg, .webp, .svg)
+---------------------------------------------------------------------
+- Smooth pan, zoom, and crisp rendering for high-resolution site photographs and inspection scans.
+
+================================================================================
+13. DOCUMENT DOWNLOAD, METADATA & VERSION CONTROL
+================================================================================
+
+13.1 Downloading Documents
+--------------------------
+- Click the "Download" button on any document row, card, or inside the preview modal.
+- The system streams the original binary file from the disk repository to your local computer 
+  with the correct original filename and extension.
+- Universal Download Policy: All authenticated users across Rahee and Ircon have full download rights.
+
+13.2 Viewing Document Metadata
+------------------------------
+- Clicking any document title opens the Document Detail view (/documents/:id).
+- Displays:
+  - Document Title & Description
+  - Full Folder Trail (e.g., Bikramshila Drive / RAHEE / Engineering)
+  - Uploading User & Email Address
+  - Upload Timestamp & File Size (in MB)
+  - Current Version Number (V1, V2, etc.)
+  - Organization Ownership
+
+13.3 Version Control
+--------------------
+- Every revision of a document retains its historical version trail.
+- Users can view previous versions, compare change descriptions, and download historical files.
+
+================================================================================
+14. DOCUMENT LIFECYCLE GOVERNANCE & RECYCLE BIN
+================================================================================
+
+14.1 Manual Document Archival
+-----------------------------
+- When a document is no longer active, Super Admin (Rajib Ghosh) can archive it by clicking 
+  the "Archive Document" button.
+- Archived documents are safely separated from active folder listings into the "Archived" tab.
+
+14.2 1-Click Document Restoration
+---------------------------------
+- Super Admin can restore any archived document with a single click.
+- The document is immediately returned to its original folder in active status.
+
+14.3 Super Admin Deletion Protection Policy
+-------------------------------------------
+- To safeguard engineering records, permanent document deletion is locked to Super Admins.
+- Deleting an active document moves it into the central Recycle Bin & Recovery Vault.
+
+14.4 Central Recycle Bin & Recovery Vault (/recycle-bin)
+--------------------------------------------------------
+- Accessible exclusively by Super Admin (Rajib Ghosh).
+- Displays all deleted folders and files with their original directory paths, deleted by info, 
+  and timestamps.
+- Features:
+  1. Restore Individual Item: Restores the file or folder straight back to its original location.
+  2. Restore All Items: Restores all deleted items across the repository in a single batch.
+  3. Permanent Purge: Permanently erases the file from disk storage (with confirmation prompt).
+  4. Empty Recycle Bin: Cleans the entire recovery vault in one action.
+
+================================================================================
+15. WORKFLOW REVIEWS & APPROVAL INBOX
+================================================================================
+
+15.1 Accessing the Review Queue
+-------------------------------
+- Click "Reviews" in the left sidebar (/reviews).
+- Displays all documents pending review or approval assigned to your role.
+
+15.2 Review Actions & Decisions
+-------------------------------
+1. Click "Review Document" on any pending entry.
+2. Inspect the document in the in-browser viewer.
+3. Select your decision:
+   - "Approve": Moves the document to the next approval stage or Final Approved status.
+   - "Reject / Request Revision": Returns the document to the uploader with mandatory comments.
+4. Enter review comments explaining the decision.
+5. Click "Submit Review Decision". The audit trail logs the review event immediately.
+
+================================================================================
+16. NOTIFICATION ROUTING ENGINE & SYSTEM EMAIL OUTBOX
+================================================================================
+
+16.1 Notification Dispatch Rules by Company
+-------------------------------------------
+When a document is uploaded, notifications are routed based on corporate affiliation:
+
+- RAHEE Document Uploads:
+  - Notifications Dispatched To:
+    * Rahul Dey (Admin)
+    * Somnath Mondal (Execution Control)
+    * Kiran Sankar Chowdhury (Manager)
+    * Mukesh Kumar Prasad (Manager)
+    * Pintu Bhukta (Manager)
+  - Notifications Suppressed For:
+    * Manish Kumar Patra, Ayush Khaitan, Manoj Ghosh, Arunabha Pyne.
+
+- IRCON Document Uploads:
+  - Notifications Dispatched Strictly To:
+    * Om Jha (Admin)
+    * Shardu Kumar Rastogi (Execution Control)
+    * Chandra Bijay Singh (Review)
+
+16.2 In-App Notification Bell
+-----------------------------
+- The Notification Bell icon in the top header displays unread alert badges in real time.
+- Clicking any notification navigates directly to the associated document.
+- Click "Mark All as Read" to clear the unread counter.
+
+16.3 System Email Outbox (/emails)
+----------------------------------
+- Records all outgoing email notifications generated by upload and review events.
+- Displays Recipient Email, Subject, Event Type, Delivery Status (SENT), and Timestamp.
+- Click the "Eye" preview icon on any entry to inspect the full rendered HTML email.
+
+16.4 Email Trash & Outbox Management
+------------------------------------
+- Users can clear the active outbox by moving old notifications into the Email Trash tab.
+- Emails in trash can be restored back to the active outbox or permanently purged.
+
+================================================================================
+17. USER MANAGEMENT & CREDENTIAL GOVERNANCE (SUPER ADMIN)
+================================================================================
+
+Accessible exclusively by Super Admin (Rajib Ghosh) at /users:
+
+17.1 Provisioning New User Accounts
+-----------------------------------
+1. Click the "+ Create New User" button at top-right.
+2. Fill in the required fields:
+   - Full Name (e.g., "Amitabh Sen")
+   - Email ID / Username (e.g., "amitabh.s@rahee.com")
+   - Account Password (min. 6 characters)
+   - Tenant Organization (Rahee Infratech or Ircon International)
+   - Function / Designation (Admin, Execution Control, Manager, Reviewer, Viewer)
+   - Document Access Capability (Upload or Viewer)
+3. Click "Create Account". The account is instantly provisioned and active.
+
+17.2 Role & Capability Mapping
+------------------------------
+- Function "Admin" -> Maps to RAHEE_ADMIN (Role 2) or IRCON_ADMIN (Role 8) with folder & upload rights.
+- Function "Execution Control" + Capability "Upload" -> Maps to DOCUMENT_UPLOADER (Role 7).
+- Function "Manager / Reviewer / Viewer" -> Maps to MANAGER_OVERSIGHT (Role 6) with view/preview/download rights.
+
+17.3 Password Reset & Account Unlocking
+---------------------------------------
+1. In the Users table, click the "Reset Password" button next to any user.
+2. Enter the new password and confirm it.
+3. Click "Save Password". The password takes effect immediately and clears any active login lockouts.
+
+17.4 User Account Activation / Deactivation
+-------------------------------------------
+- Toggle the "Disable Account" / "Enable Account" button next to any user to immediately 
+  suspend or restore system access.
+
+================================================================================
+18. MULTI-TENANT ORGANIZATION MANAGEMENT
+================================================================================
+
+Accessible by Super Admin at /organizations:
+- Overview of registered companies (Rahee Infratech Limited, Ircon International Limited).
+- Displays total users, total documents, and folder counts per organization.
+- Ability to register new tenant organizations, generating a corresponding root directory 
+  branch under Bikramshila.
+- Ability to toggle tenant active/inactive status.
+
+================================================================================
+19. SYSTEM AUDIT TRAILS & COMPLIANCE LOGGING
+================================================================================
+
+Accessible at /audit-logs:
+- Immutable, append-only security log recording all platform activities:
+  - LOGIN_SUCCESS / LOGIN_FAILED / LOGOUT
+  - DOCUMENT_UPLOADED
+  - DOCUMENT_VIEWED / DOCUMENT_PREVIEWED
+  - DOCUMENT_DOWNLOADED
+  - DOCUMENT_APPROVED_STAGE_1 / DOCUMENT_APPROVED_STAGE_2 / FINAL_APPROVED
+  - DOCUMENT_REJECTED
+  - DOCUMENT_ARCHIVED / DOCUMENT_RESTORED / DOCUMENT_DELETED
+  - USER_CREATED / USER_PASSWORD_RESET / USER_STATUS_CHANGED
+  - FOLDER_CREATED / FOLDER_PERMISSIONS_CHANGED
+- Each log entry records: Timestamp, User Name, User Email, Organization, Action, 
+  Details/Comment, and Client IP Address.
+- Filterable by user email, action type, and date range.
+
+================================================================================
+20. ADVANCED REPORTS & ANALYTICS
+================================================================================
+
+Accessible at /reports:
+1. Executive Metrics: Total documents, total folders, approved documents, and storage volume.
+2. Document Types Breakdown (Donut Chart): Real-time breakdown of PDF, CAD, Word, Excel, PPT, and Images.
+3. Company Distribution (Bar Chart): Comparative breakdown of document assets between Rahee and Ircon.
+4. Workflow Status Distribution: Breakdown of documents across Draft, Pending Review, and Final Approved states.
+5. Live Auto-Refresh: Updates every 5 seconds with an on-demand manual refresh trigger.
+
+================================================================================
+21. SYSTEM INSTALLATION, STARTUP & MAINTENANCE GUIDE
+================================================================================
+
+21.1 Infrastructure Prerequisites
+---------------------------------
+- Node.js: Version 18.0.0 or higher.
+- MySQL Server: Version 8.0 or higher (or MySQL 5.7+).
+- Operating System: Windows Server / Windows 10/11, Linux (Ubuntu/Debian/RHEL), or macOS.
+
+21.2 Database Initialization & Schema Seeding
+---------------------------------------------
+1. Start your MySQL Server service.
+2. Import the master schema and initial seed data:
+   Using MySQL Command Line:
+   ```cmd
+   mysql -u root -p < backend/schema.sql
+   ```
+   Or open `backend/schema.sql` in MySQL Workbench / phpMyAdmin and execute the script.
+3. Database `enterprise_dms` is created with all 13 tables, roles, permissions, folders, 
+   and verified default user accounts.
+
+21.3 Backend Service Startup
+----------------------------
+1. Open PowerShell or Command Prompt.
+2. Navigate to the backend directory:
+   ```cmd
+   cd backend
+   ```
+3. Install dependencies (first time only):
+   ```cmd
+   npm install
+   ```
+4. Start the backend REST and WebSocket server:
+   ```cmd
+   npm start
+   ```
+   - Server runs on: http://localhost:5000
+   - Health check endpoint: http://localhost:5000/api/health (returns `{"status":"UP"}`)
+
+21.4 Frontend Web Application Startup
+-------------------------------------
+1. Open a new PowerShell or Command Prompt terminal.
+2. Navigate to the frontend directory:
+   ```cmd
+   cd frontend
+   ```
+3. Install frontend dependencies (first time only):
+   ```cmd
+   npm install
+   ```
+4. Start the Vite development web server:
+   ```cmd
+   npm run dev
+   ```
+   - Web application URL: http://localhost:5173
+
+21.5 Network Binding & Dynamic IP Resolution
+--------------------------------------------
+- The frontend includes a dynamic host resolver (`frontend/src/services/api.js`).
+- If accessed from another computer on the local area network (LAN) via `http://192.168.X.X:5173`, 
+  the application automatically binds API requests to `http://192.168.X.X:5000` with zero CORS issues.
+
+================================================================================
+22. COMPLETE REST API REFERENCE
+================================================================================
+
+Authentication Endpoints:
+-------------------------
+- POST /api/auth/login
+  Body: { "email": "user@rahee.com", "password": "password" }
+  Returns: { "success": true, "token": "<JWT_TOKEN>", "user": { ... } }
+
+- GET /api/auth/me
+  Headers: Authorization: Bearer <JWT_TOKEN>
+  Returns: Active user profile, designation, organization, and granted permissions.
+
+Document Endpoints:
+-------------------
+- GET /api/documents
+  Query Params: ?folder_id=2&document_type=CAD&search=Track&limit=30&offset=0
+  Returns: Array of document metadata objects and total count.
+
+- POST /api/documents (Multipart / Form-Data)
+  Payload: files (binary), folder_id, document_type, category, files_metadata (JSON string)
+  Returns: Created document records and assigned IDs.
+
+- GET /api/documents/:id
+  Returns: Full metadata, folder hierarchy trail, and version history.
+
+- GET /api/documents/:id/preview
+  Returns: Streamed binary data or rendered HTML preview.
+
+- GET /api/documents/:id/download
+  Returns: Streamed original binary file attachment with original filename header.
+
+- POST /api/documents/:id/archive (Super Admin Only)
+  Returns: Success confirmation and moved status.
+
+- POST /api/documents/:id/restore (Super Admin Only)
+  Returns: Restored active status in original folder.
+
+- DELETE /api/documents/:id (Super Admin Only)
+  Returns: Moves document to Recycle Bin.
+
+Folder Endpoints:
+-----------------
+- GET /api/folders
+  Returns: Complete Bikramshila folder tree with document counts.
+
+- POST /api/folders
+  Body: { "name": "Folder Name", "parent_id": 2, "description": "..." }
+  Returns: Created folder object.
+
+- PUT /api/folders/:id
+  Body: { "name": "New Name", "description": "..." }
+  Returns: Updated folder metadata.
+
+- GET /api/folders/:id/permissions
+  Returns: Granted role and user permission rules for this folder.
+
+- POST /api/folders/:id/permissions
+  Body: { "permissions": [ ... ], "apply_to_subfolders": true }
+  Returns: Updated permission confirmation.
+
+Recycle Bin Endpoints (Super Admin Only):
+-----------------------------------------
+- GET /api/recycle-bin/items
+  Returns: List of deleted folders and documents in the recovery vault.
+
+- POST /api/recycle-bin/restore/document/:id
+  Returns: Restores file to its original target folder path.
+
+- POST /api/recycle-bin/restore/folder/:id
+  Returns: Restores folder and its subfolders to original hierarchy.
+
+- POST /api/recycle-bin/restore-all
+  Returns: Restores all items in bin.
+
+- DELETE /api/recycle-bin/permanent/document/:id
+  Returns: Permanently erases file and purges disk storage.
+
+- DELETE /api/recycle-bin/empty
+  Returns: Permanently empties recovery vault.
+
+User & Report Endpoints:
+------------------------
+- GET /api/users - List system users (All Users).
+- POST /api/users - Create new user (Super Admin Only).
+- PUT /api/users/:id/reset-password - Reset user password (Super Admin Only).
+- PATCH /api/users/:id/status - Toggle user active/disabled status (Super Admin Only).
+- GET /api/reports/dashboard - Real-time metrics, storage breakdown, and chart data.
+- GET /api/audit-logs - Immutable system audit logs with search and action filters.
+- GET /api/notifications/emails - Delivery logs for all system notifications.
+
+================================================================================
+23. TROUBLESHOOTING & FREQUENTLY ASKED QUESTIONS (FAQ)
+================================================================================
+
+Q1: What should I do if I forget my password or get locked out?
+A1: Contact Super Administrator (Rajib Ghosh at rajib.g@rahee.com). The Super Admin 
+    can immediately reset your password and clear the login lockout from the 
+    Users Management console.
+
+Q2: Why is the "Upload Document" menu item not visible on my account?
+A2: In accordance with project governance, document uploading is restricted to 
+    designated uploaders (Rahul Dey and Somnath Mondal for Rahee, Om Jha for Ircon). 
+    Managers and Reviewers have full view, preview, and download privileges.
+
+Q3: Can Ircon team members view blueprints uploaded by Rahee Infratech?
+A3: Yes. All authenticated users across both organizations operate inside the central 
+    Bikramshila repository and have full search, preview, and download access 
+    across both company branches.
+
+Q4: What file formats are supported for in-browser preview?
+A4: PDF (.pdf), Microsoft Word (.doc, .docx), Microsoft Excel (.xls, .xlsx), 
+    Microsoft PowerPoint (.ppt, .pptx), CAD Blueprints (.dwg, .dxf, .stl, .obj, .step, .stp, .iges), 
+    and Images (.jpg, .jpeg, .png, .webp, .svg).
+
+Q5: What is the maximum file size I can upload?
+A5: The platform is configured with generous 500MB payload limits and zero artificial 
+    storage caps on disk, easily accommodating large engineering blueprints.
+
+Q6: How do I recover a document that was deleted?
+A6: Contact Super Admin (Rajib Ghosh). The Super Admin can access the Recycle Bin 
+    (/recycle-bin) and restore the document back to its exact original folder with 1 click.
+
+Q7: What happens if the database connection temporarily drops?
+A7: The backend features zero-crash connection resilience, 45-second heartbeat pings, 
+    and automated query retries that recover instantly without dropping user sessions.
+
+================================================================================
+24. TECHNICAL SUPPORT & GOVERNANCE CONTACTS
+================================================================================
+
+For administrative governance, account provisioning, or technical assistance:
+
+1. Super Administrator & Master Governance:
+   - Name  : Rajib Ghosh
+   - Email : rajib.g@rahee.com
+   - Org   : Rahee Infratech Limited / Bikramshila Central Project
+
+2. Rahee Infratech Administration:
+   - Name  : Rahul Dey
+   - Email : rahul.d@rahee.com
+   - Org   : Rahee Infratech Limited
+
+3. Ircon International Administration:
+   - Name  : Om Jha
+   - Email : om.jha@ircon.org
+   - Org   : Ircon International Limited
+
+4. Global System Administration:
+   - Email : superadmin@enterprise-dms.com
+
+================================================================================
+END OF USER MANUAL - ENTERPRISE DOCUMENT MANAGEMENT SYSTEM (EDMS)
+================================================================================
