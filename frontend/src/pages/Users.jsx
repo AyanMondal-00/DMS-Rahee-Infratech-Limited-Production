@@ -23,7 +23,8 @@ import {
   Layers,
   FileCheck,
   Upload,
-  Check
+  Check,
+  Trash2
 } from 'lucide-react';
 
 export default function Users() {
@@ -220,6 +221,48 @@ export default function Users() {
     }
   };
 
+  const handleDeleteUser = async (targetUser) => {
+    if (
+      targetUser.role_name === 'SUPER_ADMIN' || 
+      targetUser.designation === 'Super Admin' || 
+      targetUser.id === user?.id || 
+      targetUser.id === 11 || 
+      targetUser.email === 'rajib.g@rahee.com'
+    ) {
+      showAlert({
+        title: 'Action Prohibited',
+        message: 'Security Constraint: Global Super Administrator account (Rajib Ghosh) cannot be deleted.',
+        type: 'error'
+      });
+      return;
+    }
+
+    const confirmed = await showConfirm({
+      title: 'Permanently Delete User',
+      message: `Are you sure you want to permanently delete user account "${targetUser.name}" (${targetUser.email})? This action cannot be undone.`,
+      confirmText: 'Delete User Account',
+      isDanger: true
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const res = await api.delete(`/users/${targetUser.id}`);
+      showAlert({
+        title: 'User Deleted',
+        message: res.data?.message || `User account '${targetUser.name}' has been deleted successfully.`,
+        type: 'success'
+      });
+      fetchUsers();
+    } catch (err) {
+      showAlert({
+        title: 'Deletion Failed',
+        message: err.response?.data?.message || 'Failed to delete user account.',
+        type: 'error'
+      });
+    }
+  };
+
   // Default fallback permissions by role ID if API mapping is loading or not populated
   const defaultRolePermissions = {
     1: ['view', 'preview', 'download', 'manage_users', 'view_audit_logs', 'view_reports', 'manage_folders'],
@@ -321,6 +364,7 @@ export default function Users() {
                   <th className="py-4 px-5">Function / Designation</th>
                   <th className="py-4 px-5">Document Access Capability</th>
                   <th className="py-4 px-5">Password Reset</th>
+                  <th className="py-4 px-5 text-center">Delete User</th>
                   <th className="py-4 px-5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -407,6 +451,30 @@ export default function Users() {
                               <KeyRound className="w-3.5 h-3.5 text-amber-600" />
                               <span>Reset Password</span>
                             </button>
+                          )}
+                        </td>
+
+                        {/* Delete User Column */}
+                        <td className="py-3.5 px-5 text-center">
+                          {user?.is_super_admin && (
+                            (isSuper || u.role_name === 'SUPER_ADMIN' || u.id === user?.id || u.email === 'rajib.g@rahee.com') ? (
+                              <span 
+                                className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-400 border border-slate-200/80 rounded-lg text-[10px] font-bold cursor-not-allowed select-none"
+                                title="Primary Super Administrator cannot be deleted"
+                              >
+                                Protected
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteUser(u)}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 hover:border-rose-300 rounded-lg font-bold text-[11px] shadow-2xs transition active:scale-95 cursor-pointer"
+                                title={`Permanently delete user account for ${u.name}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Delete User</span>
+                              </button>
+                            )
                           )}
                         </td>
 

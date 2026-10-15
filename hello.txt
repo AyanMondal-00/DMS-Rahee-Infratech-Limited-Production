@@ -1,0 +1,72 @@
+================================================================================
+   NEW USER CREATION: FUNCTION (DESIGNATION) WISE PERMISSION BREAKDOWN
+================================================================================
+
+Super Admin jokhon "Create Enterprise User" modal theke notun kono user create kore,
+tokhon "Function (Designation)" choose korle oi notun user actually ki ki permission pabe,
+tar details breakdown niche dewa holo:
+
+--------------------------------------------------------------------------------
+1. PERMISSION SUMMARY TABLE
+--------------------------------------------------------------------------------
+
++----------------------------------+-----------------------+-------------------+-----------------------------+----------------+---------------+----------------------------+-----------------------+
+| Function (Designation) Selected  | System Role Assigned  | File / Doc Upload | Folder & Sub-Folder Create  | Preview & View | File Download | Receive Email Notification | Audit Logs & Reports  |
++----------------------------------+-----------------------+-------------------+-----------------------------+----------------+---------------+----------------------------+-----------------------+
+| Admin (Company Administration)   | RAHEE_ADMIN /         | ⚠️ (Blocked via   | ✅ Yes (Nijer Company       | ✅ Yes         | ✅ Yes        | ✅ Yes                     | ✅ Yes                |
+|                                  | IRCON_ADMIN           | backend hardcode) | Branch directory-te)        |                |               |                            |                       |
++----------------------------------+-----------------------+-------------------+-----------------------------+----------------+---------------+----------------------------+-----------------------+
+| Execution Control                | DOCUMENT_UPLOADER     | ⚠️ (Blocked via   | ❌ No (Admins only)          | ✅ Yes         | ✅ Yes        | ✅ Yes                     | ✅ Yes                |
+|                                  | (Role ID 7)           | backend hardcode) |                             |                |               |                            |                       |
++----------------------------------+-----------------------+-------------------+-----------------------------+----------------+---------------+----------------------------+-----------------------+
+| Manager                          | MANAGER_OVERSIGHT     | ❌ No             | ❌ No                        | ✅ Yes         | ✅ Yes        | ✅ Yes                     | ✅ Yes                |
+|                                  | (Role ID 6)           |                   |                             |                |               |                            |                       |
++----------------------------------+-----------------------+-------------------+-----------------------------+----------------+---------------+----------------------------+-----------------------+
+| Document Reviewer                | MANAGER_OVERSIGHT     | ❌ No             | ❌ No                        | ✅ Yes         | ✅ Yes        | ✅ Yes                     | ❌ No                 |
+|                                  | (Role ID 6)           |                   |                             |                |               |                            |                       |
++----------------------------------+-----------------------+-------------------+-----------------------------+----------------+---------------+----------------------------+-----------------------+
+| Viewer                           | MANAGER_OVERSIGHT     | ❌ No             | ❌ No                        | ✅ Yes         | ✅ Yes        | ✅ Yes                     | ❌ No                 |
+|                                  | (Role ID 6)           |                   |                             |                |               |                            |                       |
++----------------------------------+-----------------------+-------------------+-----------------------------+----------------+---------------+----------------------------+-----------------------+
+
+
+--------------------------------------------------------------------------------
+2. KENO NOTUN USER BANANOR POR PERMISSION THAKCHE NA? (ROOT CAUSE)
+--------------------------------------------------------------------------------
+
+Apni je problem ta notice korechen je notun user bananor por tar upload ba onnano
+permission thakche na, tar ashol karon holo backend-e kichu HARDCODED checks ache:
+
+A. FILE UPLOAD BLOCK ISSUE:
+   - Frontend theke Super Admin notun user-ke "Admin" ba "Execution Control" (Upload capability)
+     die create korleo, backend-er "backend/src/controllers/document.controller.js" (Line 44-60)-e
+     shudhu purono 3 joner email hardcode kora ache:
+       1) rahul.d@rahee.com
+       2) om.jha@ircon.org
+       3) s.mondal@rahee.com
+   - Tai notun user jokhon upload korte jay, backend take error dei:
+     "Forbidden: Document upload is strictly restricted to Rahul Dey, Om Jha, and Somnath Mondal."
+
+B. FOLDER CREATE RESTRICTION:
+   - "backend/src/controllers/folder.controller.js" file-eo same vabe shudhu Rahul Dey,
+     Om Jha ebong Super Admin chara onno kauke folder create korte diche na.
+
+C. EMAIL NOTIFICATION:
+   - Notun user jodi 4 jon excluded list-e na thake (manish, ayush, manoj, arunabha),
+     tobe se 100% email notification pabe jokhon-i kono notun document upload hobe.
+
+
+--------------------------------------------------------------------------------
+3. SHORT SUMMARY
+--------------------------------------------------------------------------------
+
+- Admin & Execution Control:
+  View, Download, Email pabe, kintu Upload block hoye jachhe backend-er hardcoded email check-er karone.
+
+- Manager, Reviewer, Viewer:
+  Eder kaj-i holo shudhu View, Preview, Download ar Email pawa (eder folder create ba upload permission asholei thakar kotha na).
+
+Jodi apni chan je notun user-ke "Admin" ba "Execution Control" banale se jeno shotti-shotti
+Upload korte pare, tahole backend-er oi hardcoded email check ta dynamic kore role/capability
+onujayi permission dite hobe.
+================================================================================

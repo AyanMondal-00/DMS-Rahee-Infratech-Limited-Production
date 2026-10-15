@@ -47,10 +47,12 @@ async function uploadDocument(req, res) {
       userEmail === 'rahul.d@rahee.com' ||
       userEmail.startsWith('om.jha@') ||
       userEmail === 's.mondal@rahee.com' ||
+      userEmail === 'spandan@siliconsystems.in' ||
       userName.includes('rahul dey') ||
       userName.includes('om jha') ||
       userName.includes('somnath mondal') ||
-      [5, 9, 10].includes(req.user.id);
+      userName.includes('spandan') ||
+      [5, 9, 10, 18].includes(req.user.id);
 
     if (!isAuthorizedUploader) {
       cleanUploadedFiles();
@@ -307,7 +309,11 @@ async function uploadDocument(req, res) {
           type: isUploader ? 'DOCUMENT_UPLOAD_SUCCESS' : 'NEW_DOCUMENT_UPLOADED',
           emailDetails: {
             documentTitle: doc.title,
-            documentVersion: verTag
+            documentType: doc.document_type || 'General',
+            documentVersion: verTag,
+            uploaderName: req.user.name,
+            uploadedAt: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            isUploader: isUploader
           }
         });
       }

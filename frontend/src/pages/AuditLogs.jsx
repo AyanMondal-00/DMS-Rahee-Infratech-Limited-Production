@@ -5,32 +5,57 @@ import { ShieldCheck, Search, Filter, RefreshCw, Building2 } from 'lucide-react'
 export default function AuditLogs() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [userEmailSearch, setUserEmailSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (offset = 0, isAppend = false) => {
     try {
-      setLoading(true);
-      let queryParams = [];
+      if (isAppend) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      let queryParams = [
+        `limit=20`,
+        `offset=${offset}`
+      ];
       if (userEmailSearch) queryParams.push(`user_email=${encodeURIComponent(userEmailSearch)}`);
       if (actionFilter) queryParams.push(`action=${encodeURIComponent(actionFilter)}`);
 
-      const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+      const queryString = `?${queryParams.join('&')}`;
       const res = await api.get(`/audit-logs${queryString}`);
 
       if (res.data.success) {
-        setLogs(res.data.auditLogs);
+        const fetchedLogs = res.data.auditLogs || [];
+        if (isAppend) {
+          setLogs(prev => [...prev, ...fetchedLogs]);
+        } else {
+          setLogs(fetchedLogs);
+        }
+        setHasMore(res.data.hasMore || false);
+        setTotalCount(res.data.totalCount || 0);
       }
-      setLoading(false);
     } catch (err) {
       console.error(err);
+    } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchLogs();
+    fetchLogs(0, false);
   }, [userEmailSearch, actionFilter]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchLogs(logs.length, true);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -146,6 +171,30 @@ export default function AuditLogs() {
                 ))}
               </tbody>
             </table>
+
+            {/* Load More Pagination Footer */}
+            <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
+              <p className="text-xs text-slate-500 font-medium">
+                Showing <span className="font-bold text-slate-900">{logs.length}</span> of <span className="font-bold text-slate-900">{totalCount}</span> audit records
+              </p>
+
+              {hasMore && (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="flex items-center space-x-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl shadow-sm transition disabled:opacity-50"
+                >
+                  {loadingMore ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                      <span>Loading next 20 logs...</span>
+                    </>
+                  ) : (
+                    <span>Load More (Next 20)</span>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="p-12 text-center text-slate-400 text-xs">

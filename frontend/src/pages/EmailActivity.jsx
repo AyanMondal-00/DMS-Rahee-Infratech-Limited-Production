@@ -19,39 +19,85 @@ export default function EmailActivity() {
   const [emailLogs, setEmailLogs] = useState([]);
   const [deletedLogs, setDeletedLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [activeHasMore, setActiveHasMore] = useState(false);
+  const [trashHasMore, setTrashHasMore] = useState(false);
+  const [activeTotal, setActiveTotal] = useState(0);
+  const [trashTotal, setTrashTotal] = useState(0);
   const [selectedEmail, setSelectedEmail] = useState(null);
 
-  const fetchAllLogs = async () => {
+  const fetchActiveLogs = async (offset = 0, isAppend = false) => {
     try {
-      setLoading(true);
-      try {
-        const resActive = await api.get('/notifications/emails');
-        if (resActive.data.success) {
-          setEmailLogs(resActive.data.emailLogs || []);
-        }
-      } catch (errActive) {
-        console.error('Active emails fetch failed:', errActive);
-      }
+      if (isAppend) setLoadingMore(true);
+      else setLoading(true);
 
-      try {
-        const resDeleted = await api.get('/notifications/emails/deleted');
-        if (resDeleted.data.success) {
-          setDeletedLogs(resDeleted.data.emailLogs || []);
+      const res = await api.get('/notifications/emails', { params: { limit: 20, offset } });
+      if (res.data.success) {
+        const fetched = res.data.emailLogs || [];
+        if (isAppend) {
+          setEmailLogs(prev => [...prev, ...fetched]);
+        } else {
+          setEmailLogs(fetched);
         }
-      } catch (errDeleted) {
-        console.error('Deleted emails fetch failed:', errDeleted);
+        setActiveHasMore(res.data.hasMore || false);
+        setActiveTotal(res.data.totalCount || 0);
       }
-
-      setLoading(false);
     } catch (err) {
-      console.error(err);
+      console.error('Active emails fetch failed:', err);
+    } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const fetchTrashLogs = async (offset = 0, isAppend = false) => {
+    try {
+      if (isAppend) setLoadingMore(true);
+      else setLoading(true);
+
+      const res = await api.get('/notifications/emails/deleted', { params: { limit: 20, offset } });
+      if (res.data.success) {
+        const fetched = res.data.emailLogs || [];
+        if (isAppend) {
+          setDeletedLogs(prev => [...prev, ...fetched]);
+        } else {
+          setDeletedLogs(fetched);
+        }
+        setTrashHasMore(res.data.hasMore || false);
+        setTrashTotal(res.data.totalCount || 0);
+      }
+    } catch (err) {
+      console.error('Deleted emails fetch failed:', err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const fetchAllLogs = async () => {
+    if (activeTab === 'active') {
+      await fetchActiveLogs(0, false);
+    } else {
+      await fetchTrashLogs(0, false);
     }
   };
 
   useEffect(() => {
-    fetchAllLogs();
-  }, []);
+    if (activeTab === 'active') {
+      fetchActiveLogs(0, false);
+    } else {
+      fetchTrashLogs(0, false);
+    }
+  }, [activeTab]);
+
+  const handleLoadMore = () => {
+    if (loadingMore) return;
+    if (activeTab === 'active' && activeHasMore) {
+      fetchActiveLogs(emailLogs.length, true);
+    } else if (activeTab === 'trash' && trashHasMore) {
+      fetchTrashLogs(deletedLogs.length, true);
+    }
+  };
 
   useEffect(() => {
     if (liveContextEmailLogs && liveContextEmailLogs.length > 0) {
@@ -383,6 +429,30 @@ export default function EmailActivity() {
                 ))}
               </tbody>
             </table>
+
+            {/* Load More Pagination Footer */}
+            <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
+              <p className="text-xs text-slate-500 font-medium">
+                Showing <span className="font-bold text-slate-900">{currentList.length}</span> of <span className="font-bold text-slate-900">{activeTab === 'active' ? activeTotal : trashTotal}</span> email logs
+              </p>
+
+              {((activeTab === 'active' && activeHasMore) || (activeTab === 'trash' && trashHasMore)) && (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="flex items-center space-x-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-xl shadow-sm transition disabled:opacity-50"
+                >
+                  {loadingMore ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                      <span>Loading next 20 logs...</span>
+                    </>
+                  ) : (
+                    <span>Load More (Next 20)</span>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="p-12 text-center text-slate-400 text-xs">

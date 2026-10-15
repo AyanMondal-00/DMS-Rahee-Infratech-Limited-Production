@@ -163,34 +163,57 @@ async function deleteUser(req, res) {
     const { id } = req.params;
     const targetId = parseInt(id);
 
-    if (targetId === 1) {
-      return res.status(400).json({ success: false, message: 'Security Constraint: Primary Super Administrator account cannot be deleted.' });
-    }
-
     if (targetId === req.user.id) {
       return res.status(400).json({ success: false, message: 'You cannot delete your own active user account.' });
     }
 
-    const targetUsers = await db.query('SELECT id, name, email, organization_id FROM users WHERE id = ?', [targetId]);
+    const targetUsers = await db.query(
+      `SELECT u.id, u.name, u.email, u.organization_id, u.role_id, r.name as role_name 
+       FROM users u 
+       LEFT JOIN roles r ON u.role_id = r.id 
+       WHERE u.id = ?`, 
+      [targetId]
+    );
     const targetUser = targetUsers[0];
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'User account not found.' });
+    }
+
+    // Security Constraint: Super Admin accounts can never be deleted
+    if (
+      targetId === 1 || 
+      targetId === 11 || 
+      targetUser.role_id === 1 || 
+      targetUser.role_name === 'SUPER_ADMIN' || 
+      targetUser.email === 'rajib.g@rahee.com'
+    ) {
+      return res.status(400).json({ success: false, message: 'Security Constraint: Global Super Administrator account (Rajib Ghosh) cannot be deleted.' });
     }
 
     if (!req.user.is_super_admin) {
       return res.status(403).json({ success: false, message: 'Forbidden: User account deletion is strictly restricted to the Global Super Admin ONLY.' });
     }
 
-    await db.query('DELETE FROM users WHERE id = ?', [targetId]);
+    try {
+      await db.query('DELETE FROM users WHERE id = ?', [targetId]);
+    } catch (dbErr) {
+      if (dbErr.code === 'ER_ROW_IS_REFERENCED_2' || (dbErr.message && dbErr.message.includes('foreign key constraint'))) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot permanently delete user '${targetUser.name}' because they have active document submissions or audit history. Please use 'Disable Account' to preserve immutable compliance records.` 
+        });
+      }
+      throw dbErr;
+    }
 
     await logAudit({
       organization_id: targetUser.organization_id,
       action: 'USER_DELETED',
-      comment: `User account '${targetUser.email}' (${targetUser.name}) was deleted from the system.`,
+      comment: `User account '${targetUser.email}' (${targetUser.name}) was deleted from the system by Super Admin.`,
       req
     });
 
-    return res.json({ success: true, message: `User account '${targetUser.name}' deleted successfully.` });
+    return res.json({ success: true, message: `User account '${targetUser.name}' (${targetUser.email}) deleted successfully.` });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

@@ -375,7 +375,8 @@ export default function Documents() {
   const isRajibGhosh = userEmail === 'rajib.g@rahee.com' || userName.includes('rajib ghosh') || user?.is_super_admin || user?.role_id === 1 || user?.id === 11;
   const isOmJha = userEmail.startsWith('om.jha@') || userName.includes('om jha') || user?.id === 10;
   const isSomnathMondal = userEmail === 's.mondal@rahee.com' || userName.includes('somnath mondal') || user?.id === 9;
-  const isAuthorizedUploader = isRahulDey || isOmJha || isSomnathMondal;
+  const isSpandan = userEmail === 'spandan@siliconsystems.in' || userName.includes('spandan') || user?.id === 18;
+  const isAuthorizedUploader = isRahulDey || isOmJha || isSomnathMondal || isSpandan;
 
   const isRaheeAdmin = !isSomnathMondal && (isRahulDey || isRajibGhosh || ((user?.organization_id === 1 || user?.organization_code === 'RAHEE' || userEmail.includes('@rahee.com')) && (
     [2, 3].includes(user?.role_id) ||
@@ -392,7 +393,7 @@ export default function Documents() {
   ));
 
   const isCompanyAdmin = user?.is_super_admin || isRahulDey || isRajibGhosh || isOmJha || isRaheeAdmin || isIrconAdmin;
-  const canCreateFolder = !isSomnathMondal && (user?.is_super_admin || isRahulDey || isRajibGhosh || isOmJha || isRaheeAdmin || isIrconAdmin);
+  const canCreateFolder = user?.is_super_admin || isRahulDey || isRajibGhosh || isOmJha || isRaheeAdmin || isIrconAdmin || isSomnathMondal;
 
   const canDeleteDocument = (doc) => {
     if (user?.is_super_admin) return true;

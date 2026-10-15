@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { isNotificationRestrictedUser } from '../context/NotificationContext';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -15,6 +16,7 @@ export default function Sidebar() {
   const { user, hasPermission } = useAuth();
   const isSuperAdmin = !!user?.is_super_admin || user?.role_id === 1 || user?.email === 'rajib.g@rahee.com';
   const isSystemOrCompanyAdmin = isSuperAdmin || [1, 2, 8].includes(user?.role_id) || user?.email === 'rahul.d@rahee.com' || hasPermission('manage_users');
+  const isNotificationRestricted = isNotificationRestrictedUser(user);
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: true },
@@ -22,7 +24,7 @@ export default function Sidebar() {
     { to: '/users', label: 'Users & Roles', icon: Users, show: isSuperAdmin },
     { to: '/organizations', label: 'Tenant Organizations', icon: Building2, show: isSuperAdmin },
     { to: '/recycle-bin', label: 'Recycle Bin', icon: Trash2, show: isSuperAdmin },
-    { to: '/emails', label: 'Email Outbox Logs', icon: Mail, show: true },
+    { to: '/emails', label: 'Email Outbox Logs', icon: Mail, show: !isNotificationRestricted },
     { to: '/audit-logs', label: 'System Audit Logs', icon: ShieldCheck, show: true }
   ];
 

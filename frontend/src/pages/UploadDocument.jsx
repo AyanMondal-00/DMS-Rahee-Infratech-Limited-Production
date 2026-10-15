@@ -157,10 +157,12 @@ export default function UploadDocument() {
     userEmail === 'rahul.d@rahee.com' ||
     userEmail.startsWith('om.jha@') ||
     userEmail === 's.mondal@rahee.com' ||
+    userEmail === 'spandan@siliconsystems.in' ||
     userName.includes('rahul dey') ||
     userName.includes('om jha') ||
     userName.includes('somnath mondal') ||
-    [5, 9, 10].includes(user?.id);
+    userName.includes('spandan') ||
+    [5, 9, 10, 18].includes(user?.id);
 
   if (!isAuthorizedUploader) {
     return <Navigate to="/documents" replace />;

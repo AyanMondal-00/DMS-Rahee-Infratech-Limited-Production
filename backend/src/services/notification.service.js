@@ -150,31 +150,88 @@ async function sendBatchNotifications(notificationsList) {
     }
 
     // 3. Asynchronous non-blocking batch email processing
+    // CONSOLIDATION RULE: If multiple documents are uploaded simultaneously, each recipient receives exactly 1 summary email listing all uploaded files
     if (emailsToDispatch.length > 0) {
       setImmediate(async () => {
+        // Group items by recipient email to avoid sending N separate emails
+        const groupedByRecipient = new Map();
         for (const mail of emailsToDispatch) {
-          try {
-            const bodyHtml = generateEmailTemplate({
+          const key = mail.recipientEmail.toLowerCase();
+          if (!groupedByRecipient.has(key)) {
+            groupedByRecipient.set(key, {
+              recipientEmail: mail.recipientEmail,
               recipientName: mail.recipientName,
-              title: mail.title,
-              headline: mail.title,
-              message: mail.message,
-              documentTitle: mail.emailDetails.documentTitle || 'Document',
-              documentVersion: mail.emailDetails.documentVersion || 'V1',
-              badgeColor: mail.type.includes('REJECT') ? '#ef4444' : (mail.type.includes('APPROVED') || mail.type.includes('FINAL') ? '#10b981' : '#3b82f6')
+              type: mail.type,
+              uploaderName: mail.emailDetails.uploaderName || 'User',
+              uploadedAt: mail.emailDetails.uploadedAt,
+              isUploader: mail.emailDetails.isUploader,
+              documents: []
+            });
+          }
+          groupedByRecipient.get(key).documents.push({
+            title: mail.emailDetails.documentTitle,
+            document_type: mail.emailDetails.documentType,
+            version: mail.emailDetails.documentVersion
+          });
+        }
+
+        // Dispatch exactly 1 consolidated email per recipient
+        for (const [, grp] of groupedByRecipient) {
+          try {
+            const docCount = grp.documents.length;
+            const isSingle = docCount === 1;
+
+            let subject = '';
+            let headline = '';
+            let message = '';
+            let docTitleForLog = '';
+
+            if (grp.isUploader) {
+              subject = isSingle
+                ? `📄 Document Uploaded Successfully - ${grp.documents[0].title}`
+                : `📄 ${docCount} Documents Uploaded Successfully - Enterprise DMS`;
+              headline = isSingle
+                ? 'Your document has been uploaded successfully'
+                : `Your ${docCount} documents have been uploaded successfully`;
+              message = isSingle
+                ? `Your document "${grp.documents[0].title}" (${grp.documents[0].version}) has been uploaded successfully and saved to the repository.`
+                : `You have successfully uploaded ${docCount} documents into the Enterprise DMS repository.`;
+              docTitleForLog = isSingle ? grp.documents[0].title : `${docCount} Documents (${grp.documents.map(d => d.title).slice(0, 3).join(', ')}${docCount > 3 ? '...' : ''})`;
+            } else {
+              subject = isSingle
+                ? `🔔 New Document Uploaded: ${grp.documents[0].title}`
+                : `🔔 ${docCount} New Documents Uploaded by ${grp.uploaderName}`;
+              headline = isSingle
+                ? `A new document was uploaded by ${grp.uploaderName}`
+                : `${docCount} new documents were uploaded by ${grp.uploaderName}`;
+              message = isSingle
+                ? `A new document "${grp.documents[0].title}" (${grp.documents[0].version}) was uploaded by ${grp.uploaderName} and is available in the repository.`
+                : `${grp.uploaderName} has uploaded ${docCount} new documents to the repository. Please review the summary below.`;
+              docTitleForLog = isSingle ? grp.documents[0].title : `${docCount} Documents (${grp.documents.map(d => d.title).slice(0, 3).join(', ')}${docCount > 3 ? '...' : ''})`;
+            }
+
+            const bodyHtml = generateEmailTemplate({
+              recipientName: grp.recipientName,
+              title: subject,
+              headline: headline,
+              message: message,
+              documentTitle: isSingle ? grp.documents[0].title : `${docCount} Documents`,
+              documentVersion: isSingle ? grp.documents[0].version : 'V1',
+              documents: grp.documents,
+              badgeColor: grp.type.includes('REJECT') ? '#ef4444' : (grp.type.includes('APPROVED') || grp.type.includes('FINAL') ? '#10b981' : '#3b82f6')
             });
 
             await sendWorkflowEmail({
-              toEmail: mail.recipientEmail,
-              toName: mail.recipientName,
-              subject: `${mail.title} - ${mail.emailDetails.documentTitle || ''}`,
-              eventType: mail.type,
-              documentTitle: mail.emailDetails.documentTitle,
+              toEmail: grp.recipientEmail,
+              toName: grp.recipientName,
+              subject: subject,
+              eventType: grp.type,
+              documentTitle: docTitleForLog,
               bodyHtml,
               socketIo: io
             });
           } catch (e) {
-            console.error('Batch email send error:', e.message);
+            console.error('Batch email send error for recipient:', e.message);
           }
         }
       });

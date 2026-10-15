@@ -30,14 +30,35 @@ async function getAuditLogs(req, res) {
       params.push(`%${req.query.user_email.trim()}%`);
     }
 
+    const limit = Math.min(Math.max(parseInt(req.query.limit || 20, 10), 1), 100);
+    const offset = Math.max(parseInt(req.query.offset || 0, 10), 0);
+
     if (whereClauses.length > 0) {
       sql += ' WHERE ' + whereClauses.join(' AND ');
     }
 
-    sql += ' ORDER BY a.id DESC LIMIT 200';
+    // Get total count matching active filters
+    let countSql = `
+      SELECT COUNT(*) as total 
+      FROM audit_logs a
+      ${whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : ''}
+    `;
+    const countRes = await db.query(countSql, params);
+    const rawTotal = countRes[0] ? (countRes[0].total !== undefined ? countRes[0].total : countRes[0]['COUNT(*)']) : 0;
+    const totalCount = parseInt(rawTotal || 0, 10);
+
+    sql += ' ORDER BY a.id DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
     const logs = await db.query(sql, params);
-    return res.json({ success: true, auditLogs: logs });
+    return res.json({ 
+      success: true, 
+      auditLogs: logs,
+      totalCount,
+      limit,
+      offset,
+      hasMore: (offset + logs.length) < totalCount
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }

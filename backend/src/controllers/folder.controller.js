@@ -97,6 +97,7 @@ async function createFolder(req, res) {
     const isRahulDey = userEmail === 'rahul.d@rahee.com' || userName.includes('rahul dey') || req.user.id === 5;
     const isRajibGhosh = userEmail === 'rajib.g@rahee.com' || userName.includes('rajib ghosh') || req.user.is_super_admin || req.user.role_id === 1 || req.user.id === 11;
     const isOmJha = userEmail.startsWith('om.jha@') || userName.includes('om jha') || req.user.id === 10;
+    const isSomnathMondal = userEmail === 's.mondal@rahee.com' || userName.includes('somnath mondal') || req.user.id === 9;
     const isSuperAdmin = req.user.is_super_admin || req.user.role_id === 1 || userRole === 'SUPER_ADMIN';
 
     const isRaheeAdmin = isRahulDey || isRajibGhosh || ((req.user.organization_id === 1 || req.user.organization_code === 'RAHEE') && (
@@ -113,7 +114,7 @@ async function createFolder(req, res) {
       userEmail.startsWith('om.jha@')
     ));
 
-    if (!isRahulDey && !isRajibGhosh && !isOmJha && !isSuperAdmin && !isRaheeAdmin && !isIrconAdmin) {
+    if (!isRahulDey && !isRajibGhosh && !isOmJha && !isSuperAdmin && !isRaheeAdmin && !isIrconAdmin && !isSomnathMondal) {
       return res.status(403).json({
         success: false,
         message: 'Forbidden: Folder creation is strictly restricted to designated Admins (Rahul Dey for Rahee, Om Jha for Ircon, and Super Admin).'
@@ -125,7 +126,7 @@ async function createFolder(req, res) {
 
     // Auto-resolve parent folder if omitted
     if (!parentId) {
-      if (isRahulDey || isRaheeAdmin) {
+      if (isRahulDey || isRaheeAdmin || isSomnathMondal) {
         const raheeFolder = await db.query("SELECT id FROM folders WHERE UPPER(name) = 'RAHEE' LIMIT 1");
         if (raheeFolder.length > 0) parentId = raheeFolder[0].id;
       } else if (isOmJha || isIrconAdmin) {

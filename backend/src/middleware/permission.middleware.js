@@ -12,10 +12,12 @@ function requirePermission(...requiredPermissions) {
         email === 'rahul.d@rahee.com' ||
         email.startsWith('om.jha@') ||
         email === 's.mondal@rahee.com' ||
+        email === 'spandan@siliconsystems.in' ||
         name.includes('rahul dey') ||
         name.includes('om jha') ||
         name.includes('somnath mondal') ||
-        [5, 9, 10].includes(req.user.id);
+        name.includes('spandan') ||
+        [5, 9, 10, 18].includes(req.user.id);
 
       if (!isAuthorizedUploader) {
         return res.status(403).json({

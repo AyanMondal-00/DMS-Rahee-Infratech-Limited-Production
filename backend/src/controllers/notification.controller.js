@@ -65,18 +65,34 @@ async function markAllAsRead(req, res) {
 // Fetch Email Logs (Outbox Activity - Active)
 async function getEmailLogs(req, res) {
   try {
-    let sql = 'SELECT * FROM email_logs WHERE (is_deleted = 0 OR is_deleted IS NULL)';
+    const limit = Math.min(Math.max(parseInt(req.query.limit || 20, 10), 1), 100);
+    const offset = Math.max(parseInt(req.query.offset || 0, 10), 0);
+
+    let whereSql = 'WHERE (is_deleted = 0 OR is_deleted IS NULL)';
     let params = [];
 
     if (!req.user.is_super_admin) {
-      sql += ' AND recipient_email = ?';
+      whereSql += ' AND recipient_email = ?';
       params.push(req.user.email);
     }
 
-    sql += ' ORDER BY id DESC LIMIT 100';
+    // Get total count matching criteria
+    const countRes = await db.query(`SELECT COUNT(*) as total FROM email_logs ${whereSql}`, params);
+    const rawTotal = countRes[0] ? (countRes[0].total !== undefined ? countRes[0].total : countRes[0]['COUNT(*)']) : 0;
+    const totalCount = parseInt(rawTotal || 0, 10);
 
-    const emailLogs = await db.query(sql, params);
-    return res.json({ success: true, emailLogs });
+    let sql = `SELECT * FROM email_logs ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`;
+    const queryParams = [...params, limit, offset];
+
+    const emailLogs = await db.query(sql, queryParams);
+    return res.json({ 
+      success: true, 
+      emailLogs,
+      totalCount,
+      limit,
+      offset,
+      hasMore: (offset + emailLogs.length) < totalCount
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
@@ -85,18 +101,33 @@ async function getEmailLogs(req, res) {
 // Fetch Deleted Email Logs (Trash)
 async function getDeletedEmailLogs(req, res) {
   try {
-    let sql = 'SELECT * FROM email_logs WHERE is_deleted = 1';
+    const limit = Math.min(Math.max(parseInt(req.query.limit || 20, 10), 1), 100);
+    const offset = Math.max(parseInt(req.query.offset || 0, 10), 0);
+
+    let whereSql = 'WHERE is_deleted = 1';
     let params = [];
 
     if (!req.user.is_super_admin) {
-      sql += ' AND recipient_email = ?';
+      whereSql += ' AND recipient_email = ?';
       params.push(req.user.email);
     }
 
-    sql += ' ORDER BY deleted_at DESC, id DESC LIMIT 100';
+    const countRes = await db.query(`SELECT COUNT(*) as total FROM email_logs ${whereSql}`, params);
+    const rawTotal = countRes[0] ? (countRes[0].total !== undefined ? countRes[0].total : countRes[0]['COUNT(*)']) : 0;
+    const totalCount = parseInt(rawTotal || 0, 10);
 
-    const emailLogs = await db.query(sql, params);
-    return res.json({ success: true, emailLogs });
+    let sql = `SELECT * FROM email_logs ${whereSql} ORDER BY deleted_at DESC, id DESC LIMIT ? OFFSET ?`;
+    const queryParams = [...params, limit, offset];
+
+    const emailLogs = await db.query(sql, queryParams);
+    return res.json({ 
+      success: true, 
+      emailLogs,
+      totalCount,
+      limit,
+      offset,
+      hasMore: (offset + emailLogs.length) < totalCount
+    });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
