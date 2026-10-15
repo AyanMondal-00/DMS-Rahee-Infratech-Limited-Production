@@ -413,6 +413,8 @@ async function createTables() {
 
   try { await query('ALTER TABLE email_logs ADD COLUMN is_deleted INTEGER DEFAULT 0'); } catch (e) {}
   try { await query('ALTER TABLE email_logs ADD COLUMN deleted_at DATETIME DEFAULT NULL'); } catch (e) {}
+  try { await query('ALTER TABLE email_logs ADD COLUMN retry_count INTEGER DEFAULT 0'); } catch (e) {}
+  try { await query('ALTER TABLE email_logs ADD COLUMN last_error TEXT DEFAULT NULL'); } catch (e) {}
 
   // Performance Indexes
   try { await query('CREATE INDEX idx_docs_org_status ON documents(organization_id, status, is_deleted)'); } catch (e) {}

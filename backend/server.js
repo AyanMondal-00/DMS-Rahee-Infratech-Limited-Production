@@ -19,8 +19,10 @@ const io = new Server(server, {
   }
 });
 
-// Register Socket.IO instance into notification service
+// Register Socket.IO instance into notification service & outbox recovery worker
 setSocketIO(io);
+const { startOutboxWorker } = require('./src/config/email');
+startOutboxWorker(io);
 
 io.on('connection', (socket) => {
   // User room join event for targeted notifications
